@@ -24,8 +24,32 @@ export interface SourceRecord {
   provider_type: string | null;
 }
 
+export interface SourceAuthor {
+  provider_record_id: string | null;
+  display_name: string | null;
+  orcid: string | null;
+}
+
+export interface SourcePrimaryLocation {
+  source_provider_record_id: string | null;
+  source_name: string | null;
+  landing_page_url: string | null;
+  version: string | null;
+  is_open_access: boolean | null;
+}
+
+export interface SourceDetailsRecord extends SourceRecord {
+  authors: SourceAuthor[] | null;
+  language: string | null;
+  primary_location: SourcePrimaryLocation | null;
+}
+
 export interface SearchSourcesResult {
   query: string;
   limit: number;
   results: SourceRecord[];
+}
+
+export interface GetSourceDetailsResult {
+  source: SourceDetailsRecord;
 }

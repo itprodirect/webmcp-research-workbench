@@ -1,4 +1,9 @@
-import type { SourceRecord } from "../domain/source-record";
+import type {
+  SourceAuthor,
+  SourceDetailsRecord,
+  SourcePrimaryLocation,
+  SourceRecord,
+} from "../domain/source-record.ts";
 
 export class OpenAlexNormalizationError extends Error {
   constructor(message: string) {
@@ -35,6 +40,22 @@ export function normalizeOpenAlexWork(
   };
 }
 
+export function normalizeOpenAlexWorkDetails(
+  value: unknown,
+  retrievedAt: string,
+): SourceDetailsRecord {
+  if (!isRecord(value)) {
+    throw new OpenAlexNormalizationError("OpenAlex work must be an object.");
+  }
+
+  return {
+    ...normalizeOpenAlexWork(value, retrievedAt),
+    authors: nullableAuthors(value.authorships),
+    language: nullableString(value.language, "language"),
+    primary_location: nullablePrimaryLocation(value.primary_location),
+  };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -64,6 +85,107 @@ function nullableInteger(value: unknown, field: string): number | null {
     throw new OpenAlexNormalizationError(`OpenAlex ${field} must be an integer or null.`);
   }
   return value;
+}
+
+function nullableBoolean(value: unknown, field: string): boolean | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value !== "boolean") {
+    throw new OpenAlexNormalizationError(`OpenAlex ${field} must be a boolean or null.`);
+  }
+  return value;
+}
+
+function nullableAuthors(value: unknown): SourceAuthor[] | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (!Array.isArray(value)) {
+    throw new OpenAlexNormalizationError(
+      "OpenAlex authorships must be an array or null.",
+    );
+  }
+
+  return value.map((authorship) => {
+    if (!isRecord(authorship) || !isRecord(authorship.author)) {
+      throw new OpenAlexNormalizationError(
+        "OpenAlex authorship must contain an author object.",
+      );
+    }
+
+    return {
+      provider_record_id: nullableOpenAlexEntityId(
+        authorship.author.id,
+        "author id",
+        "A",
+      ),
+      display_name: nullableString(authorship.author.display_name, "author display_name"),
+      orcid: nullableString(authorship.author.orcid, "author orcid"),
+    };
+  });
+}
+
+function nullablePrimaryLocation(value: unknown): SourcePrimaryLocation | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (!isRecord(value)) {
+    throw new OpenAlexNormalizationError(
+      "OpenAlex primary_location must be an object or null.",
+    );
+  }
+
+  const source = value.source;
+  if (source !== null && source !== undefined && !isRecord(source)) {
+    throw new OpenAlexNormalizationError(
+      "OpenAlex primary_location source must be an object or null.",
+    );
+  }
+
+  return {
+    source_provider_record_id: isRecord(source)
+      ? nullableOpenAlexEntityId(source.id, "source id", "S")
+      : null,
+    source_name: isRecord(source)
+      ? nullableString(source.display_name, "source display_name")
+      : null,
+    landing_page_url: nullableString(
+      value.landing_page_url,
+      "primary_location landing_page_url",
+    ),
+    version: nullableString(value.version, "primary_location version"),
+    is_open_access: nullableBoolean(
+      value.is_oa,
+      "primary_location is_oa",
+    ),
+  };
+}
+
+function nullableOpenAlexEntityId(
+  value: unknown,
+  field: string,
+  prefix: "A" | "S",
+): string | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  if (typeof value !== "string") {
+    throw new OpenAlexNormalizationError(`OpenAlex ${field} must be a string or null.`);
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new OpenAlexNormalizationError(`OpenAlex ${field} must be an absolute URL.`);
+  }
+
+  const match = parsed.pathname.match(new RegExp(`^/(${prefix}\\d+)/?$`));
+  if (parsed.protocol !== "https:" || parsed.hostname !== "openalex.org" || !match) {
+    throw new OpenAlexNormalizationError(`OpenAlex ${field} is not recognized.`);
+  }
+  return match[1];
 }
 
 function parseOpenAlexWorkId(value: string): string {
