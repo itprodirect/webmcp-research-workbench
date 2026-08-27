@@ -13,6 +13,7 @@ This document records factual Technical Gate observations from 2026-08-27. It do
 - Implementation commit: `e3559a0041af707284a18ba4c4af55710629d6e8`
 - Remote: `https://github.com/itprodirect/webmcp-research-workbench.git`
 - Preflight result: expected branch, SHA, subject, clean working tree, and remote all matched before modification.
+- Deployment continuation preflight: `codex/technical-gate` at `6072bebb0d96818cc3fec6e7a9566f939bc31141`, clean and tracking `origin/codex/technical-gate`; local `main` remained at the frozen baseline.
 
 ## Implemented architecture
 
@@ -165,28 +166,48 @@ Tool results were delivered through the browser's WebMCP capability. DOM inspect
 - **PASS — local ID comparison:** the ordered normalized ID sequences matched.
 - `retrieved_at` was allowed to differ between independent requests.
 
-### Chrome and deployed-production boundary
+### Deployment and deployed browser-agent observations
+
+- **PASS — Vercel identity/team:** Vercel CLI `55.0.0` reported user `nick-5900` and active team `nick-fergusons-projects-301cfd45` / `Nick Ferguson's projects`.
+- **PASS — project selection:** the team project listing contained no existing `webmcp-research-workbench` project. The checkout was linked to a new project with that exact name under the verified team. Vercel detected Next.js and configured Node.js `24.x`.
+- **PASS — production deployment:** deployment `dpl_2wJgn6QRxo16xCxZgZWS6voSBuxt` completed with target `production` and status `Ready`. The Vercel build detected Next.js `16.3.3`, ran `npm run build`, compiled successfully, completed TypeScript checks, generated the static `/` route, and emitted dynamic `/api/search`.
+- **PASS — production URL reachability:** <https://webmcp-research-workbench.vercel.app/> returned HTTP 200 with `text/html; charset=utf-8`.
+- **PASS — live shared search route:** `POST https://webmcp-research-workbench.vercel.app/api/search` with `{"query":"browser agents","limit":5}` returned HTTP 200 and the five normalized IDs already listed in this document.
+- **NOT EXECUTED — preview deployment:** only the requested completed gate build was deployed to production; no separate preview deployment was created.
+- **BLOCKED — immutable deployment URL public reachability:** <https://webmcp-research-workbench-ooptf52lq.vercel.app/> returned HTTP 302 to Vercel SSO. The production alias remained publicly reachable and was used for all deployed browser tests.
+- **BLOCKED — automatic GitHub deployment connection:** project linking attempted to connect `itprodirect/webmcp-research-workbench`, but Vercel reported that it could not connect the repository. CLI deployment still completed successfully; automatic Git-triggered deployment was not established.
+
+Deployed compatible-browser test surface: Codex In-app Browser. The control surface did not expose a browser version or user agent. No origin-trial token was added. The in-app browser exposed a WebMCP capability and discovered the page tool on the deployed production alias.
+
+Natural-language agent request used for each attempt:
+
+> Search OpenAlex for five sources about browser agents using the page's `search_sources` tool without using the visible form.
+
+Three fresh reload/discovery/invocation attempts were performed against <https://webmcp-research-workbench.vercel.app/>:
+
+1. **PASS — deployed discovery/invocation:** discovered exactly `search_sources`; observed required `query`, optional bounded `limit`, `additionalProperties: false`, `readOnlyHint: true`, and `untrustedContentHint: true`; invocation returned the five expected normalized IDs.
+2. **PASS — deployed discovery/invocation:** fresh discovery observed the same tool, schema, annotations, origin, and page URL; invocation returned the same ordered five IDs.
+3. **PASS — deployed discovery/invocation:** fresh discovery observed the same tool, schema, and annotations; invocation returned the same ordered five IDs.
+
+For all three tool attempts:
+
+- The returned ordered IDs were `openalex:W2162077280`, `openalex:W2145699321`, `openalex:W2109381845`, `openalex:W1807707985`, and `openalex:W1974073260`.
+- The tool result came directly from the browser's WebMCP capability.
+- The visible search input remained empty and the page rendered zero result cards after invocation.
+- No DOM content supplied the tool result. Post-call DOM checks were used only to verify the absence of UI actuation.
+- Separate invocations produced different `retrieved_at` timestamps, as expected.
+
+Deployed human UI observation:
+
+- **PASS — deployed UI search:** the same query and limit rendered five records with no error.
+- **PASS — deployed UI/WebMCP ID comparison:** the UI and all three WebMCP attempts returned the same ordered normalized IDs.
+- **PASS — deployed external-link handling:** each rendered link used an OpenAlex HTTPS URL, `target="_blank"`, and `rel="noopener noreferrer"`.
+
+Chrome-specific observation:
 
 - **PASS — installed Chrome version check:** `151.0.7922.174`.
-- **BLOCKED — connected Chrome WebMCP API:** on `http://localhost:3000/`, the connected Chrome document reported no `modelContext` property. The testing flag was therefore not effective in that Chrome profile. No system/browser flag was changed.
-- **BLOCKED — Vercel authentication:** Vercel CLI `55.0.0` exists, but `vercel whoami` reported that the saved token is invalid. No `.vercel` project link exists.
-- **NOT EXECUTED — deployment:** account/team/project ownership could not be established without valid authentication, so no preview or production deployment was attempted and no URL is claimed.
-- **NOT EXECUTED — deployed WebMCP registration/discovery/invocation:** no deployed URL existed.
-- **NOT EXECUTED — production compatible-browser natural-language agent test:** local browser-agent evidence exists, but the required deployed production-compatible observation does not.
-
-**NOT EXECUTED — HUMAN/COMPATIBLE BROWSER VALIDATION REQUIRED**
-
-## Manual deployed browser-agent procedure
-
-1. Run `vercel login` and authenticate the intended owner account.
-2. Confirm the intended Vercel team and project before linking; do not create or select an ambiguous project.
-3. From `codex/technical-gate`, deploy the committed gate build and record the exact preview and production URLs plus HTTP status.
-4. Use a compatible Chrome version. Either enable `chrome://flags/#enable-webmcp-testing` and relaunch for controlled testing, or enroll the exact deployed origin in the active WebMCP origin trial and use only the real issued token. Do not fabricate a token.
-5. Open the deployed URL. In Chrome DevTools, open Application -> WebMCP and confirm exactly one available imperative tool named `search_sources`, its schema, and both annotations.
-6. In a compatible browser agent, issue: “Search OpenAlex for five sources about browser agents using the page's `search_sources` tool without using the visible form.”
-7. Record discovery, actual invocation, returned normalized IDs, visible-form state, invocation log, errors, Chrome version, flag/origin-trial state, and confirmation that no DOM scraping supplied the results.
-8. Repeat from a fresh page load at least three times.
-9. Run the same query and limit through the human UI and compare ordered normalized IDs. A `retrieved_at` difference is expected.
+- **BLOCKED — connected Chrome-native WebMCP exposure:** on the deployed production alias, the connected Chrome document reported no `modelContext` property and the browser-control surface exposed no WebMCP capability. No browser flag or system setting was changed. Chrome-native discovery/invocation therefore remains unavailable in that profile.
+- The in-app browser's isolated read-only page evaluation also did not expose `document.modelContext`, although its browser-level WebMCP capability discovered and invoked the registered page tool. The capability result, not DOM inspection or manual API execution, supplied the deployed tool evidence.
 
 ## Security audit
 
@@ -194,7 +215,7 @@ Tool results were delivered through the browser's WebMCP capability. DOM inspect
 - **PASS — annotations:** `readOnlyHint` and `untrustedContentHint` are both true and were observed in local discovery.
 - **PASS — rendering:** no provider HTML or Markdown rendering exists.
 - **PASS — external navigation:** links are opt-in user actions, scheme-gated to HTTP(S), and use safe new-context attributes.
-- **PASS — secrets:** no tracked or untracked `.env*` file, `NEXT_PUBLIC_*` use, credential-like assignment, private-key marker, or API key was found in the scoped files. No environment secret values were inspected or printed.
+- **PASS — secrets:** no `.env*` file is tracked, and no `NEXT_PUBLIC_*` use, credential-like assignment, private-key marker, or API key was found in tracked files. Vercel created a local ignored `.env.local` during project linking; its contents were not inspected or printed, and neither it nor the ignored `.vercel/` link metadata appears in the Git diff.
 - **PASS — provider errors:** timeout, network/HTTP failure, malformed JSON/shape/record, oversized response, redirect, and over-limit result behavior remain explicit.
 - **PASS — unknown metadata:** null values remain null and ordinary works remain source class `unknown` unless the provider explicitly reports `preprint`.
 
@@ -217,10 +238,10 @@ The single `github` occurrence in implementation files is a negative input-valid
 
 ## Limitations and unexecuted requirements
 
-- Vercel deployment is blocked until the intended account is authenticated and the project/team choice is unambiguous.
-- No preview or production URL exists from this run.
-- The connected Chrome profile did not expose `document.modelContext`; its WebMCP testing flag was not effective.
+- No preview deployment was created; the committed gate build was deployed directly to production.
+- The immutable deployment-specific URL is protected by Vercel SSO, while the production alias is publicly reachable.
+- Vercel could not establish the automatic GitHub repository connection during linking; deployment was completed through the authenticated CLI.
+- The connected Chrome 151 profile did not expose `document.modelContext`; no testing flag or system setting was changed.
 - No origin-trial token was available or added.
-- The Codex In-app Browser demonstrated local discovery and invocation three times, but did not expose a browser version.
-- The required deployed production-compatible browser-agent test remains unexecuted and must not be inferred from local success.
+- The Codex In-app Browser completed three deployed discovery/invocation attempts but did not expose a browser version or user agent.
 - Final gate classification remains a human decision outside this evidence document.
