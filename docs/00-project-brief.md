@@ -2,9 +2,9 @@
 
 ## Status
 
-**V0 Planning Baseline — 2026-08-27**
+**Planning Baseline V0 — 2026-08-27**
 
-Current disposition: **GO WITH CONDITIONS**. The project may proceed only after the one-tool WebMCP technical feasibility gate succeeds.
+Current disposition: **GO WITH CONDITIONS**. The project may proceed only after the one-tool WebMCP Technical Gate succeeds.
 
 ## Problem
 
@@ -51,9 +51,15 @@ The application remains deliberately non-autonomous. The human retains authority
 - Narrow, typed operations.
 - No fake credibility or truth score.
 
-## V0 scope
+## Scope terminology
 
-A small search, source-detail, and in-memory research-packet workflow. The eventual V0 combines a human-readable interface with narrow WebMCP operations backed by the same server-side domain logic. The technical gate is narrower: one OpenAlex-backed `search_sources` operation and the minimum UI needed to verify matching normalized source IDs.
+- **Planning Baseline V0:** This canonical planning and documentation package. It authorizes no implementation by itself.
+- **Technical Gate:** The one-provider, one-tool `search_sources` feasibility experiment using OpenAlex and the minimum human UI needed to verify the shared search path.
+- **Challenge MVP:** The larger product scope that may proceed only after a recorded Technical Gate PASS.
+
+## Challenge MVP vision
+
+The Challenge MVP vision is a small search, source-detail, and in-memory research-packet workflow. It combines a human-readable interface with narrow WebMCP operations backed by the same server-side domain logic. This vision is not authorized by Planning Baseline V0 alone. The Technical Gate remains narrower: one OpenAlex-backed `search_sources` operation and the minimum UI needed to verify matching normalized source IDs and the shared server-side search implementation.
 
 ## Non-goals
 
@@ -62,9 +68,9 @@ A small search, source-detail, and in-memory research-packet workflow. The event
 - Runtime LLM, RAG, or vector database.
 - Crawler, arbitrary URL fetching, or generalized web scraping.
 - Autonomous research loops or agent-controlled conclusions and mutations.
-- Broad provider coverage before the technical gate.
+- Broad provider coverage before a Technical Gate PASS.
 - Importing Research Intelligence source data, Gray Swan competition evidence, restricted prompts, private research artifacts, credentials, or unrelated client/project data.
 
-## Gate condition
+## Technical Gate condition
 
-The full MVP is not authorized until a deployed compatible browser agent can reliably discover and invoke `search_sources` against real OpenAlex data, with the UI and WebMCP path returning the same normalized source IDs through shared domain logic. If WebMCP adds no meaningful benefit over UI inference, reconsider the project instead of expanding it.
+The Technical Gate asks whether WebMCP provides a reliable explicit machine interface to the same research capability without requiring the browser agent to scrape, actuate, or infer the rendered UI. A PASS requires observable output consistency, including matching normalized source IDs, plus structural code inspection confirming that the human UI and WebMCP paths terminate at the same server-side search/domain implementation rather than separate provider or search business logic. The broader question of whether this creates a materially better human-agent research experience belongs to Challenge MVP evaluation.

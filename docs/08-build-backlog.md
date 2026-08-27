@@ -2,7 +2,7 @@
 
 Work proceeds in strict order. Completion of a phase does not authorize the next phase unless its review or gate decision is explicit.
 
-## Phase 0 — Planning baseline
+## Phase 0 — Planning Baseline V0
 
 - Establish the canonical brief, hypotheses, source strategy, tool design, security boundaries, success criteria, demo plan, backlog, and decision log.
 - Add repository operating instructions and conservative ignore rules.
@@ -10,9 +10,9 @@ Work proceeds in strict order. Completion of a phase does not authorize the next
 
 No application implementation belongs in Phase 0.
 
-## Phase 1 — Technical feasibility gate
+## Phase 1 — Technical Gate
 
-After explicit approval of Phase 0, and only then:
+After explicit approval of Planning Baseline V0, and only then:
 
 1. Scaffold a minimal Next.js application.
 2. Deploy the initial Vercel application.
@@ -31,20 +31,33 @@ After explicit approval of Phase 0, and only then:
 ## Gate decision
 
 - Evaluate the evidence against `06-mvp-success-criteria.md` as PASS, PARTIAL, or FAIL.
-- PASS permits a separately reviewed MVP plan.
-- PARTIAL requires resolving or explicitly re-scoping the gate; it does not permit feature expansion.
-- FAIL triggers the kill criterion: stop or reconsider the concept rather than adding adapters and features.
+- PASS permits immediate execution of the smallest approved Challenge MVP scope; it does not authorize unapproved features or broad product replanning.
+- PARTIAL permits only a bounded attempt to resolve the gate defect within the time box; a prolonged PARTIAL requires a deliberate pivot/stop decision.
+- FAIL triggers a deliberate pivot/stop decision rather than more gate engineering, adapters, or features.
 
-## Phase 2 — MVP
+## Challenge schedule targets
 
-Only after a recorded PASS decision:
+These are planning targets, not guarantees:
+
+| Target window | Bounded objective |
+| --- | --- |
+| Aug 27–28 | Complete the Technical Gate and record PASS, PARTIAL, or FAIL. |
+| Aug 28–31 | After a recorded PASS only, build the smallest approved Challenge MVP. |
+| Sep 1–2 | Complete deployment validation, supported-browser validation, README/submission materials, demo recording, and Devpost preparation. |
+| Sep 3 | Preserve a submission buffer before the 1:00 PM Pacific deadline. |
+
+The Technical Gate is time-boxed. Deadline pressure does not weaken PASS/PARTIAL/FAIL, authorize Challenge MVP work before PASS, or justify extra features. A PASS should move directly into the smallest approved Challenge MVP; a prolonged PARTIAL or FAIL should protect the remaining challenge window through an explicit pivot/stop decision.
+
+## Phase 2 — Challenge MVP
+
+Only after a recorded Technical Gate PASS:
 
 - Confirm the provisional provider set and tool count.
 - Add only approved providers through bounded server adapters.
 - Add source details and the human-controlled in-memory packet workflow.
 - Register `get_source_details` through the shared domain layer.
 - Validate provenance, deduplication behavior, trust boundaries, and production browser behavior.
-- Reassess deferred capabilities instead of assuming they belong in V0.
+- Reassess deferred capabilities instead of assuming they belong in the Challenge MVP.
 
 ## Phase 3 — Challenge submission
 

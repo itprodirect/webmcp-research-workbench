@@ -1,6 +1,6 @@
 # Agent Operating Contract
 
-These instructions apply across this repository. The planning documents in `docs/` are the canonical V0 baseline.
+These instructions apply across this repository. The planning documents in `docs/` are the canonical Planning Baseline V0.
 
 ## Think before coding
 
@@ -42,7 +42,7 @@ Unless a later explicit decision authorizes them, do not add:
 - a crawler, arbitrary-URL fetching, or generalized web scraping;
 - autonomous agent actions;
 - Research Intelligence source data or Gray Swan competition evidence;
-- providers beyond OpenAlex before the WebMCP technical gate is completed and accepted.
+- providers beyond OpenAlex before the Technical Gate is completed and accepted.
 
 Human authority over evidence selection, interpretation, packet membership, conclusions, and later mutations is not optional.
 

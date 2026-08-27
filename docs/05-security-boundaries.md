@@ -18,14 +18,14 @@ The application and its agents must not reinterpret provider text as commands, p
 
 ## WebMCP boundary
 
-Provider-returning V0 tools carry:
+Provider-returning WebMCP tools carry:
 
 ```text
 readOnlyHint: true
 untrustedContentHint: true
 ```
 
-V0 WebMCP operations are narrow and read-only. Tool descriptions and schemas must state the untrusted nature of returned content. Human authority over selection, interpretation, packet membership, conclusions, and later mutations remains intact.
+Technical Gate and Challenge MVP WebMCP operations are narrow and read-only. Tool descriptions and schemas must state the untrusted nature of returned content. Human authority over selection, interpretation, packet membership, conclusions, and later mutations remains intact.
 
 ## Network boundary
 
@@ -57,12 +57,14 @@ Only documented, non-secret client configuration may cross the server/client bou
 - Render external strings safely as text.
 - Do not inject provider HTML into the page.
 - Do not enable unsafe HTML rendering for markdown or abstracts.
-- Treat links as data and constrain their allowed behavior.
+- Treat external provider URLs as untrusted data and render links only for `http:` and `https:` schemes.
+- When a link opens a new browsing context, use safe external-link behavior such as `rel="noopener noreferrer"`.
+- Never trigger automatic navigation based solely on retrieved content.
 - Preserve the distinction between source content and application chrome.
 
 ## LLM boundary
 
-There is no runtime or server-side LLM in V0. Research retrieval and normalization must remain deterministic application behavior. Adding an LLM would require a new decision covering data flow, instruction handling, cost, privacy, and evaluation.
+There is no runtime or server-side LLM in the Technical Gate or approved Challenge MVP scope. Research retrieval and normalization must remain deterministic application behavior. Adding an LLM would require a new decision covering data flow, instruction handling, cost, privacy, and evaluation.
 
 ## Failure boundary
 

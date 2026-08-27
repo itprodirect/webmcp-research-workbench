@@ -2,11 +2,11 @@
 
 ## Technical gate
 
-**OpenAlex only.** The gate exists to test WebMCP mechanics and shared normalization, not provider breadth.
+**OpenAlex only.** The Technical Gate exists to test WebMCP mechanics and shared normalization, not provider breadth.
 
-## Expected MVP after gate
+## Expected Challenge MVP after Technical Gate
 
-Subject to an explicit passing gate decision:
+Subject to an explicit recorded Technical Gate PASS:
 
 - OpenAlex;
 - GitHub;
@@ -24,7 +24,7 @@ The official registry means a maintained allowlist of relevant first-party docum
 - NIST/NVD;
 - general web search.
 
-Deferral is intentional. Additional adapters are not authorized before the technical gate.
+Deferral is intentional. Additional adapters are not authorized before a Technical Gate PASS.
 
 ## Source classes
 
