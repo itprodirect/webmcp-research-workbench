@@ -1,11 +1,13 @@
 import "server-only";
 
-import type { SourceRecord } from "../domain/source-record";
-import { SearchSourcesError } from "../domain/search-error";
+import type { SourceDetailsRecord, SourceRecord } from "../domain/source-record.ts";
+import { SearchSourcesError } from "../domain/search-error.ts";
+import { SourceDetailsError } from "../domain/source-details-error.ts";
 import {
   normalizeOpenAlexWork,
+  normalizeOpenAlexWorkDetails,
   OpenAlexNormalizationError,
-} from "./openalex-normalize";
+} from "./openalex-normalize.ts";
 
 const OPENALEX_WORKS_ENDPOINT = "https://api.openalex.org/works";
 const OPENALEX_TIMEOUT_MS = 8_000;
@@ -18,6 +20,12 @@ const SELECTED_FIELDS = [
   "publication_year",
   "type",
   "updated_date",
+].join(",");
+const DETAIL_SELECTED_FIELDS = [
+  ...SELECTED_FIELDS.split(","),
+  "authorships",
+  "language",
+  "primary_location",
 ].join(",");
 
 interface OpenAlexSearchInput {
@@ -110,6 +118,80 @@ export async function searchOpenAlex({
   }
 }
 
+export async function getOpenAlexWork(
+  providerRecordId: string,
+  callerSignal?: AbortSignal,
+): Promise<SourceDetailsRecord> {
+  const url = new URL(`${OPENALEX_WORKS_ENDPOINT}/${providerRecordId}`);
+  url.searchParams.set("select", DETAIL_SELECTED_FIELDS);
+
+  const timeoutSignal = AbortSignal.timeout(OPENALEX_TIMEOUT_MS);
+  const signal = callerSignal
+    ? AbortSignal.any([callerSignal, timeoutSignal])
+    : timeoutSignal;
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+      redirect: "error",
+      signal,
+    });
+  } catch {
+    throwDetailsRequestFailure(timeoutSignal, callerSignal);
+  }
+
+  if (response.status === 404) {
+    throw new SourceDetailsError(
+      "source_not_found",
+      404,
+      `OpenAlex source ${providerRecordId} was not found.`,
+      "openalex",
+    );
+  }
+  if (!response.ok) {
+    throw new SourceDetailsError(
+      "provider_failure",
+      502,
+      `OpenAlex returned HTTP ${response.status}.`,
+      "openalex",
+    );
+  }
+
+  const contentLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(contentLength) && contentLength > MAX_PROVIDER_RESPONSE_BYTES) {
+    throw malformedDetailsResponse("OpenAlex response exceeded the allowed size.");
+  }
+
+  let rawBody: string;
+  try {
+    rawBody = await response.text();
+  } catch {
+    throwDetailsRequestFailure(timeoutSignal, callerSignal);
+  }
+  if (new TextEncoder().encode(rawBody).byteLength > MAX_PROVIDER_RESPONSE_BYTES) {
+    throw malformedDetailsResponse("OpenAlex response exceeded the allowed size.");
+  }
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    throw malformedDetailsResponse("OpenAlex returned invalid JSON.");
+  }
+
+  const retrievedAt = new Date().toISOString();
+  try {
+    return normalizeOpenAlexWorkDetails(payload, retrievedAt);
+  } catch (error) {
+    if (error instanceof OpenAlexNormalizationError) {
+      throw malformedDetailsResponse(error.message);
+    }
+    throw error;
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -119,6 +201,43 @@ function malformedResponse(message: string): SearchSourcesError {
     "malformed_provider_response",
     502,
     message,
+    "openalex",
+  );
+}
+
+function malformedDetailsResponse(message: string): SourceDetailsError {
+  return new SourceDetailsError(
+    "malformed_provider_response",
+    502,
+    message,
+    "openalex",
+  );
+}
+
+function throwDetailsRequestFailure(
+  timeoutSignal: AbortSignal,
+  callerSignal?: AbortSignal,
+): never {
+  if (callerSignal?.aborted) {
+    throw new SourceDetailsError(
+      "request_aborted",
+      499,
+      "Source details request was aborted.",
+      "openalex",
+    );
+  }
+  if (timeoutSignal.aborted) {
+    throw new SourceDetailsError(
+      "provider_timeout",
+      504,
+      `OpenAlex did not respond within ${OPENALEX_TIMEOUT_MS} milliseconds.`,
+      "openalex",
+    );
+  }
+  throw new SourceDetailsError(
+    "provider_failure",
+    502,
+    "OpenAlex request failed.",
     "openalex",
   );
 }
