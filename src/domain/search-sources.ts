@@ -1,8 +1,8 @@
 import "server-only";
 
-import type { SearchSourcesResult } from "./source-record";
-import { validateSearchInput } from "./search-input";
-import { searchOpenAlex } from "../providers/openalex";
+import type { SearchSourcesResult } from "./source-record.ts";
+import { validateSearchInput } from "./search-input.ts";
+import { searchOpenAlex } from "../providers/openalex.ts";
 
 export async function searchSources(
   input: unknown,
@@ -13,6 +13,7 @@ export async function searchSources(
 
   return {
     query: validated.query,
+    mode: validated.mode,
     limit: validated.limit,
     results,
   };

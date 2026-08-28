@@ -29,3 +29,23 @@ This is a living record. “Decided” means the current Planning Baseline V0; c
 | D-023 | Cache policy | Open/gating | Make no cache architecture decision until provider behavior is measured. | Freshness and rate limits must be balanced with real evidence. | Technical Gate latency, quotas, and freshness requirements. | After Technical Gate measurements. |
 | D-024 | Packet WebMCP exposure | Open/gating | Keep packet membership human-controlled; do not expose packet mutation yet. | Exposure changes state and trust boundaries. | A reviewed read/write model with clear human confirmation. | After Challenge MVP workflow validation. |
 | D-025 | Challenge schedule and gate time box | Decided | Target Aug 27–28 for the Technical Gate; Aug 28–31 for the smallest approved Challenge MVP after PASS; Sep 1–2 for validation and submission materials; and Sep 3 for a pre-deadline buffer. | The September 3, 1:00 PM Pacific deadline leaves a short window while preserving gate discipline. | An official deadline change or a PARTIAL/FAIL pivot decision. | Apply immediately through submission. |
+| D-026 | Phase 2B shared evidence mission | Decided | Implement one versioned client-side workspace shared by the human UI and WebMCP tools for a human mission, agent-staged proposals, human-accepted evidence, an agent-authored draft brief, and a compact activity ledger. | Phase 2A passed and the human explicitly authorized a bounded collaboration workflow that makes evidence membership and conclusion approval visible. | A later explicit human decision after Phase 2B review. | Phase 2B. |
+| D-027 | Phase 2B mutation authority | Decided | Permit agent mutations only to stage evidence proposals and place or replace a draft evidence brief. Evidence acceptance/rejection/removal, mission changes, brief editing/review, and brief approval remain human UI actions. | This is the minimum mutation boundary that demonstrates useful collaboration while preserving human authority. | A separate reviewed mutation design and explicit human authorization. | Enforce throughout Phase 2B. |
+| D-028 | Phase 2B tool set | Decided | Register exactly five application tools: `get_research_workspace`, `search_sources`, `get_source_details`, `propose_evidence`, and `draft_evidence_brief`. | The set covers shared context, provider retrieval, staged handoff, and bounded drafting without autonomous acceptance or publishing. | Stop for explicit approval before adding any tool. | Phase 2B. |
+| D-029 | Phase 2B persistence | Decided | Persist a bounded, schema-versioned workspace in client `localStorage`; reject malformed or unsupported persisted state safely and provide deterministic reset. | Human and agent need the same visible state across refresh without adding a database or authentication. | A later explicit durable-data architecture decision. | Phase 2B. |
+| D-030 | OpenAlex semantic search | Decided | Optionally expose `mode: keyword | semantic`, defaulting to keyword; semantic mode uses OpenAlex Works `search.semantic` directly. | Official OpenAlex-hosted semantic search satisfies the bounded need without embeddings, a vector database, a runtime model, or a new provider. | Official OpenAlex behavior or limits change. | Phase 2B. |
+
+## Phase 2B supersession — 2026-08-27
+
+Phase 2B is a new, explicit human authorization. It supersedes only the temporary earlier restrictions that all WebMCP tools were read-only, research-packet mutation was human-only, the application tool count was limited to two, and packet state was ephemeral/in-memory. The historical decisions above remain unchanged as records of the earlier gates.
+
+The superseding boundary is narrow:
+
+- agent state changes are authorized only for staged evidence proposals and draft evidence briefs;
+- an agent proposal never accepts evidence;
+- human acceptance remains mandatory for membership in the accepted-evidence set;
+- every agent-drafted finding may cite only already human-accepted source IDs;
+- human review and approval remain mandatory for final conclusions; and
+- autonomous publishing, export, submission, or other outward mutation remains prohibited.
+
+All other trust and scope constraints continue, including OpenAlex-only retrieval, untrusted provider content, no runtime LLM, no database/authentication, no arbitrary-URL fetching, no credibility score, no private evidence, and no secrets.

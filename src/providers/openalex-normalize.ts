@@ -1,9 +1,14 @@
 import type {
   SourceAuthor,
   SourceDetailsRecord,
+  SourceOpenAccess,
   SourcePrimaryLocation,
+  SourcePrimaryTopic,
   SourceRecord,
 } from "../domain/source-record.ts";
+
+export const MAX_NORMALIZED_ABSTRACT_LENGTH = 4_000;
+const MAX_ABSTRACT_POSITION = 50_000;
 
 export class OpenAlexNormalizationError extends Error {
   constructor(message: string) {
@@ -53,6 +58,10 @@ export function normalizeOpenAlexWorkDetails(
     authors: nullableAuthors(value.authorships),
     language: nullableString(value.language, "language"),
     primary_location: nullablePrimaryLocation(value.primary_location),
+    abstract: nullableAbstract(value.abstract_inverted_index),
+    cited_by_count: nullableNonNegativeInteger(value.cited_by_count, "cited_by_count"),
+    open_access: nullableOpenAccess(value.open_access),
+    primary_topic: nullablePrimaryTopic(value.primary_topic),
   };
 }
 
@@ -85,6 +94,16 @@ function nullableInteger(value: unknown, field: string): number | null {
     throw new OpenAlexNormalizationError(`OpenAlex ${field} must be an integer or null.`);
   }
   return value;
+}
+
+function nullableNonNegativeInteger(value: unknown, field: string): number | null {
+  const integer = nullableInteger(value, field);
+  if (integer !== null && integer < 0) {
+    throw new OpenAlexNormalizationError(
+      `OpenAlex ${field} must be a non-negative integer or null.`,
+    );
+  }
+  return integer;
 }
 
 function nullableBoolean(value: unknown, field: string): boolean | null {
@@ -162,10 +181,86 @@ function nullablePrimaryLocation(value: unknown): SourcePrimaryLocation | null {
   };
 }
 
+function nullableAbstract(value: unknown): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (!isRecord(value)) {
+    throw new OpenAlexNormalizationError(
+      "OpenAlex abstract_inverted_index must be an object or null.",
+    );
+  }
+
+  const positionedTokens = new Map<number, string>();
+  for (const [token, rawPositions] of Object.entries(value)) {
+    if (!token || !Array.isArray(rawPositions)) {
+      throw new OpenAlexNormalizationError(
+        "OpenAlex abstract_inverted_index entries must contain token positions.",
+      );
+    }
+    for (const position of rawPositions) {
+      if (
+        typeof position !== "number" ||
+        !Number.isInteger(position) ||
+        position < 0 ||
+        position > MAX_ABSTRACT_POSITION ||
+        positionedTokens.has(position)
+      ) {
+        throw new OpenAlexNormalizationError(
+          "OpenAlex abstract_inverted_index contained an invalid position.",
+        );
+      }
+      positionedTokens.set(position, token);
+    }
+  }
+  if (positionedTokens.size === 0) {
+    return null;
+  }
+
+  return [...positionedTokens.entries()]
+    .sort(([left], [right]) => left - right)
+    .map(([, token]) => token)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MAX_NORMALIZED_ABSTRACT_LENGTH);
+}
+
+function nullableOpenAccess(value: unknown): SourceOpenAccess | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (!isRecord(value)) {
+    throw new OpenAlexNormalizationError(
+      "OpenAlex open_access must be an object or null.",
+    );
+  }
+  return {
+    is_oa: nullableBoolean(value.is_oa, "open_access is_oa"),
+    oa_status: nullableString(value.oa_status, "open_access oa_status"),
+    oa_url: nullableString(value.oa_url, "open_access oa_url"),
+  };
+}
+
+function nullablePrimaryTopic(value: unknown): SourcePrimaryTopic | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (!isRecord(value)) {
+    throw new OpenAlexNormalizationError(
+      "OpenAlex primary_topic must be an object or null.",
+    );
+  }
+  return {
+    provider_record_id: nullableOpenAlexEntityId(value.id, "primary topic id", "T"),
+    display_name: nullableString(value.display_name, "primary topic display_name"),
+  };
+}
+
 function nullableOpenAlexEntityId(
   value: unknown,
   field: string,
-  prefix: "A" | "S",
+  prefix: "A" | "S" | "T",
 ): string | null {
   if (value === null || value === undefined || value === "") {
     return null;

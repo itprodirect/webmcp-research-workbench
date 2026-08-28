@@ -3,10 +3,14 @@ import { SearchSourcesError } from "./search-error.ts";
 export const DEFAULT_SEARCH_LIMIT = 5;
 export const MAX_SEARCH_LIMIT = 10;
 export const MAX_QUERY_LENGTH = 200;
+export const MAX_SEMANTIC_QUERY_LENGTH = 2_000;
+
+export type SearchMode = "keyword" | "semantic";
 
 export interface ValidatedSearchInput {
   query: string;
   limit: number;
+  mode: SearchMode;
 }
 
 export function validateSearchInput(input: unknown): ValidatedSearchInput {
@@ -15,7 +19,7 @@ export function validateSearchInput(input: unknown): ValidatedSearchInput {
   }
 
   const candidate = input as Record<string, unknown>;
-  const allowedKeys = new Set(["query", "limit"]);
+  const allowedKeys = new Set(["query", "limit", "mode"]);
   if (Object.keys(candidate).some((key) => !allowedKeys.has(key))) {
     throw invalidRequest("Search input contains unsupported fields.");
   }
@@ -28,8 +32,14 @@ export function validateSearchInput(input: unknown): ValidatedSearchInput {
   if (!query) {
     throw invalidRequest("Query must not be empty.");
   }
-  if (query.length > MAX_QUERY_LENGTH) {
-    throw invalidRequest(`Query must be ${MAX_QUERY_LENGTH} characters or fewer.`);
+  const mode = candidate.mode ?? "keyword";
+  if (mode !== "keyword" && mode !== "semantic") {
+    throw invalidRequest('Mode must be either "keyword" or "semantic".');
+  }
+  const maximumQueryLength =
+    mode === "semantic" ? MAX_SEMANTIC_QUERY_LENGTH : MAX_QUERY_LENGTH;
+  if (query.length > maximumQueryLength) {
+    throw invalidRequest(`Query must be ${maximumQueryLength} characters or fewer in ${mode} mode.`);
   }
 
   const limit = candidate.limit ?? DEFAULT_SEARCH_LIMIT;
@@ -42,7 +52,7 @@ export function validateSearchInput(input: unknown): ValidatedSearchInput {
     throw invalidRequest(`Limit must be an integer from 1 to ${MAX_SEARCH_LIMIT}.`);
   }
 
-  return { query, limit };
+  return { query, limit, mode };
 }
 
 function invalidRequest(message: string): SearchSourcesError {

@@ -33,6 +33,21 @@ test("normalizes meaningful OpenAlex details while preserving native identities"
         version: "publishedVersion",
         is_oa: true,
       },
+      abstract_inverted_index: {
+        "A": [0],
+        "provider": [1],
+        "abstract.": [2],
+      },
+      cited_by_count: 42,
+      open_access: {
+        is_oa: true,
+        oa_status: "gold",
+        oa_url: "https://example.org/open",
+      },
+      primary_topic: {
+        id: "https://openalex.org/T123456789",
+        display_name: "Provider Topic",
+      },
     },
     retrievedAt,
   );
@@ -54,6 +69,17 @@ test("normalizes meaningful OpenAlex details while preserving native identities"
     version: "publishedVersion",
     is_open_access: true,
   });
+  assert.equal(source.abstract, "A provider abstract.");
+  assert.equal(source.cited_by_count, 42);
+  assert.deepEqual(source.open_access, {
+    is_oa: true,
+    oa_status: "gold",
+    oa_url: "https://example.org/open",
+  });
+  assert.deepEqual(source.primary_topic, {
+    provider_record_id: "T123456789",
+    display_name: "Provider Topic",
+  });
 });
 
 test("preserves unknown detail metadata as null", () => {
@@ -69,6 +95,10 @@ test("preserves unknown detail metadata as null", () => {
       language: null,
       authorships: null,
       primary_location: null,
+      abstract_inverted_index: null,
+      cited_by_count: null,
+      open_access: null,
+      primary_topic: null,
     },
     retrievedAt,
   );
@@ -78,4 +108,8 @@ test("preserves unknown detail metadata as null", () => {
   assert.equal(source.authors, null);
   assert.equal(source.language, null);
   assert.equal(source.primary_location, null);
+  assert.equal(source.abstract, null);
+  assert.equal(source.cited_by_count, null);
+  assert.equal(source.open_access, null);
+  assert.equal(source.primary_topic, null);
 });
