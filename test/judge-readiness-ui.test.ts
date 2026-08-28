@@ -27,6 +27,17 @@ test("mission-to-agent handoff copies a clipboard-only research prompt", () => {
   assert.match(workbench, /Could not copy the research prompt\./);
 });
 
+test("manual discovery is explicitly optional, agent-first, and collapsible", () => {
+  assert.match(workbench, /Optional human source verification/);
+  assert.match(workbench, /agent performs discovery during the Research stage through WebMCP/);
+  assert.match(workbench, /Keyword and Semantic modes/);
+  assert.match(workbench, /Agent\s+Proposals for your review/);
+  assert.match(workbench, /You do not need to repeat the agent&apos;s searches/);
+  assert.match(workbench, /<details className="manual-verification">/);
+  assert.match(workbench, /Open manual search and source inspection/);
+  assert.match(styles, /\.manual-verification-content \.search-form/);
+});
+
 test("accepted evidence handoff copies the authorized prompt with accessible feedback", () => {
   const prompt =
     "In the WebMCP Research Workbench, read the current research workspace and draft the Evidence Brief for the active mission. Use only the human-accepted evidence already in the workspace when supporting or citing findings. Cite each finding to the accepted source IDs that support it, include relevant caveats about the limits of the evidence, and leave the result for human review. Do not mark it reviewed or approve it.";
@@ -59,4 +70,19 @@ test("brief review fields use dedicated readable sizing", () => {
     assert.ok(workbench.includes(`className="${className}"`));
     assert.match(styles, new RegExp(`\\.${className} \\{`));
   }
+});
+
+test("approved artifact actions are human-visible and browser-local only", () => {
+  const start = workbench.indexOf("function ApprovedBriefActions");
+  const end = workbench.indexOf("function MissionPanel", start);
+  const approvedActions = workbench.slice(start, end);
+
+  assert.match(workbench, /presentation\.state === "complete"/);
+  assert.match(approvedActions, /Download approved brief \(\.md\)/);
+  assert.match(approvedActions, /Copy approved brief/);
+  assert.match(approvedActions, /data:text\/markdown;charset=utf-8/);
+  assert.match(approvedActions, /encodeURIComponent\(markdown\)/);
+  assert.match(approvedActions, /navigator\.clipboard\.writeText\(markdown\)/);
+  assert.match(approvedActions, /download=\{getApprovedBriefFilename/);
+  assert.doesNotMatch(approvedActions, /fetch\(|workspaceStore|localStorage/);
 });

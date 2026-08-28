@@ -323,7 +323,7 @@ h4 {
   font-size: 1rem;
 }
 
-.cycle-next-action > p:last-child {
+.cycle-next-action > p:not(.cycle-turn-label) {
   color: var(--muted);
   font-size: 0.86rem;
 }
@@ -353,6 +353,42 @@ h4 {
   flex-wrap: wrap;
   gap: 0.7rem;
   margin-top: 0.65rem;
+}
+
+.approved-artifact-actions {
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid rgba(38, 106, 77, 0.2);
+}
+
+.approved-artifact-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.6rem;
+}
+
+.download-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.45rem;
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.download-button:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+}
+
+.approved-artifact-actions .copy-feedback {
+  display: block;
+  margin: 0.55rem 0 0;
 }
 
 .role-grid {
@@ -413,6 +449,102 @@ h4 {
   border-radius: 0.8rem;
   background: var(--surface);
   box-shadow: var(--shadow);
+}
+
+.verification-panel {
+  padding: clamp(0.9rem, 2vw, 1.2rem);
+}
+
+.verification-panel .section-heading {
+  align-items: center;
+  margin-bottom: 0.7rem;
+}
+
+.agent-discovery-note {
+  padding: 0.72rem 0.85rem;
+  border-left: 4px solid var(--agent);
+  border-radius: 0.35rem;
+  background: var(--agent-soft);
+}
+
+.agent-discovery-note p {
+  margin: 0;
+}
+
+.agent-discovery-note p + p {
+  margin-top: 0.25rem;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.manual-verification {
+  margin-top: 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  background: var(--surface-soft);
+}
+
+.manual-verification > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.72rem 0.8rem;
+  color: var(--text);
+  cursor: pointer;
+  list-style: none;
+}
+
+.manual-verification > summary::-webkit-details-marker {
+  display: none;
+}
+
+.manual-verification > summary::after {
+  color: var(--agent);
+  content: "+";
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.manual-verification[open] > summary::after {
+  content: "−";
+}
+
+.manual-verification > summary span {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.manual-verification > summary small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.manual-verification-content {
+  padding: 0.85rem;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.manual-verification-content .search-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 9rem auto;
+  align-items: end;
+}
+
+.manual-verification-content .grow-field,
+.manual-verification-content .mode-field {
+  min-width: 0;
+}
+
+.manual-verification-content .search-mode-guide {
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+}
+
+.manual-verification-content .search-mode-guide p {
+  padding: 0.55rem 0.65rem;
 }
 
 .mission-panel {
@@ -1021,6 +1153,15 @@ summary {
     flex-direction: column;
   }
 
+  .verification-panel .section-heading {
+    align-items: flex-start;
+    flex-direction: row;
+  }
+
+  .manual-verification-content .search-mode-guide {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .role-grid,
   .search-mode-guide,
   .compact-details-list {
@@ -1030,6 +1171,10 @@ summary {
   .research-cycle-panel {
     top: 0.25rem;
     padding: 0.8rem;
+  }
+
+  .research-cycle-complete {
+    position: static;
   }
 
   .research-cycle-steps {
@@ -1095,6 +1240,25 @@ summary {
 @media (max-width: 480px) {
   .research-cycle-panel {
     position: static;
+  }
+
+  .verification-panel .section-heading {
+    flex-direction: column;
+  }
+
+  .manual-verification-content .search-form,
+  .manual-verification-content .search-mode-guide {
+    grid-template-columns: 1fr;
+  }
+
+  .approved-artifact-buttons {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .approved-artifact-buttons button,
+  .approved-artifact-buttons .download-button {
+    width: 100%;
   }
 
   .research-cycle-heading {

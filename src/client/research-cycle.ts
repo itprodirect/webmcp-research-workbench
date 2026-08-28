@@ -51,9 +51,9 @@ export function deriveResearchCyclePresentation(
       owner: "complete",
       turnLabel: "RESEARCH CYCLE COMPLETE",
       headline:
-        "This brief is human-approved. No further agent action is required for this mission.",
+        "Research cycle complete — your human-approved research artifact is ready to use in the next stage of your work.",
       guidance:
-        "Review the collaboration log below, or reset the workspace when you are ready to begin another mission.",
+        "Download or copy the approved brief below. The Collaboration log and Reset workspace remain available as secondary actions.",
     };
   }
 

@@ -46,7 +46,7 @@ test("derives all seven Research Cycle presentation states from existing workspa
     [workspace({ mission, accepted_evidence: acceptedEvidence }), "synthesize", 3, "agent", "Draft the Evidence Brief"],
     [workspace({ mission, accepted_evidence: acceptedEvidence, brief: draft }), "review", 4, "human", "Review and edit the agent draft"],
     [workspace({ mission, accepted_evidence: acceptedEvidence, brief: { ...draft, human_reviewed: true } }), "approve", 4, "human", "Approve the reviewed brief"],
-    [workspace({ mission, accepted_evidence: acceptedEvidence, brief: { ...draft, human_reviewed: true, approved: true } }), "complete", null, "complete", "This brief is human-approved. No further agent action is required for this mission."],
+    [workspace({ mission, accepted_evidence: acceptedEvidence, brief: { ...draft, human_reviewed: true, approved: true } }), "complete", null, "complete", "Research cycle complete — your human-approved research artifact is ready to use in the next stage of your work."],
   ] as const;
 
   for (const [state, expectedState, activeStageIndex, owner, headline] of cases) {

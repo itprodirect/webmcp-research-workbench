@@ -18,6 +18,10 @@ import { searchSourcesViaServer } from "@/src/client/search-api";
 import { getSourceDetailsViaServer } from "@/src/client/source-details-api";
 import { workspaceStore } from "@/src/client/workspace-store";
 import {
+  buildApprovedBriefMarkdown,
+  getApprovedBriefFilename,
+} from "@/src/client/approved-brief-markdown";
+import {
   deriveResearchCyclePresentation,
   getResearchCycleStageStatus,
   RESEARCH_CYCLE_STAGES,
@@ -166,86 +170,109 @@ export function SearchWorkbench() {
         </p>
       )}
 
-      <section className="workspace-panel" aria-labelledby="search-heading">
+      <section
+        className="workspace-panel verification-panel"
+        aria-labelledby="search-heading"
+      >
         <div className="section-heading">
           <div>
-            <p className="section-kicker">Discover</p>
-            <h2 id="search-heading">Search / Source Inspection</h2>
+            <p className="section-kicker">Agent-first discovery</p>
+            <h2 id="search-heading">Optional human source verification</h2>
           </div>
           <span className="provider-chip">OpenAlex only</span>
         </div>
-        <form className="search-form" onSubmit={handleSubmit}>
-          <div className="field grow-field">
-            <label htmlFor="source-query">Research topic</label>
-            <input
-              id="source-query"
-              name="query"
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="e.g. indirect prompt injection in browser agents"
-              maxLength={mode === "semantic" ? 2000 : 200}
-              required
-            />
-          </div>
-          <div className="field mode-field">
-            <label htmlFor="search-mode">Mode</label>
-            <select
-              id="search-mode"
-              value={mode}
-              onChange={(event) => setMode(event.target.value as SearchMode)}
-            >
-              <option value="keyword">Keyword</option>
-              <option value="semantic">Semantic</option>
-            </select>
-          </div>
-          <button type="submit" disabled={status === "loading"}>
-            {status === "loading" ? "Searching…" : "Search"}
-          </button>
-        </form>
-        <div className="search-mode-guide" aria-label="Search mode guidance">
+        <div className="agent-discovery-note">
           <p>
-            <strong>Keyword</strong>
-            Best when you know the names, terms, acronyms, or phrases you want to
-            search for.
+            <strong>The agent performs discovery during the Research stage through WebMCP.</strong>
           </p>
           <p>
-            <strong>Semantic</strong>
-            Best when you know the idea you&apos;re researching but relevant work may
-            describe it using different words.
+            It may search OpenAlex in Keyword and Semantic modes and inspect candidate
+            records. Selected candidates enter the shared workspace under Agent
+            Proposals for your review. You do not need to repeat the agent&apos;s searches.
           </p>
         </div>
+        <details className="manual-verification">
+          <summary>
+            <span>
+              <strong>Open manual search and source inspection</strong>
+              <small>Optional — independently verify or explore OpenAlex sources.</small>
+            </span>
+          </summary>
+          <div className="manual-verification-content">
+            <form className="search-form" onSubmit={handleSubmit}>
+              <div className="field grow-field">
+                <label htmlFor="source-query">Research topic</label>
+                <input
+                  id="source-query"
+                  name="query"
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="e.g. indirect prompt injection in browser agents"
+                  maxLength={mode === "semantic" ? 2000 : 200}
+                  required
+                />
+              </div>
+              <div className="field mode-field">
+                <label htmlFor="search-mode">Mode</label>
+                <select
+                  id="search-mode"
+                  value={mode}
+                  onChange={(event) => setMode(event.target.value as SearchMode)}
+                >
+                  <option value="keyword">Keyword</option>
+                  <option value="semantic">Semantic</option>
+                </select>
+              </div>
+              <button type="submit" disabled={status === "loading"}>
+                {status === "loading" ? "Searching…" : "Search"}
+              </button>
+            </form>
+            <div className="search-mode-guide" aria-label="Search mode guidance">
+              <p>
+                <strong>Keyword</strong>
+                Best when you know the names, terms, acronyms, or phrases you want to
+                search for.
+              </p>
+              <p>
+                <strong>Semantic</strong>
+                Best when you know the idea you&apos;re researching but relevant work may
+                describe it using different words.
+              </p>
+            </div>
 
-        <SearchStatus status={status} error={error} count={results.length} mode={mode} />
+            <SearchStatus status={status} error={error} count={results.length} mode={mode} />
 
-        {results.length > 0 && (
-          <div className="results" aria-label="Search results">
-            {results.map((source) => (
-              <SourceResult
-                key={source.id}
-                source={source}
-                isLoading={
-                  detailsStatus === "loading" && selectedSourceId === source.id
-                }
-                onInspect={handleInspect}
-              />
-            ))}
+            {results.length > 0 && (
+              <div className="results" aria-label="Search results">
+                {results.map((source) => (
+                  <SourceResult
+                    key={source.id}
+                    source={source}
+                    isLoading={
+                      detailsStatus === "loading" && selectedSourceId === source.id
+                    }
+                    onInspect={handleInspect}
+                  />
+                ))}
+              </div>
+            )}
+
+            <SourceDetailsPanel
+              sourceId={selectedSourceId}
+              source={details}
+              status={detailsStatus}
+              error={detailsError}
+              workspace={workspace}
+              onAccept={(source) =>
+                performWorkspaceAction(
+                  () => workspaceStore.acceptInspectedEvidence(source),
+                  `${source.id} accepted as evidence.`,
+                )
+              }
+            />
           </div>
-        )}
-
-        <SourceDetailsPanel
-          sourceId={selectedSourceId}
-          source={details}
-          status={detailsStatus}
-          error={detailsError}
-          workspace={workspace}
-          onAccept={(source) =>
-            performWorkspaceAction(
-              () => workspaceStore.acceptInspectedEvidence(source),
-              `${source.id} accepted as evidence.`,
-            )
-          }
-        />
+        </details>
       </section>
 
       <ProposalPanel
@@ -426,8 +453,65 @@ function ResearchCycle({ workspace }: { workspace: ResearchWorkspaceState }) {
             )}
           </div>
         )}
+        {presentation.state === "complete" && (
+          <ApprovedBriefActions workspace={workspace} />
+        )}
       </div>
     </section>
+  );
+}
+
+function ApprovedBriefActions({ workspace }: { workspace: ResearchWorkspaceState }) {
+  const [feedback, setFeedback] = useState<{
+    kind: "success" | "error";
+    text: string;
+  } | null>(null);
+  const markdown = buildApprovedBriefMarkdown(workspace);
+  const downloadHref = `data:text/markdown;charset=utf-8,${encodeURIComponent(markdown)}`;
+
+  async function handleCopyApprovedBrief() {
+    try {
+      if (!navigator.clipboard) {
+        throw new Error("Clipboard API unavailable.");
+      }
+      await navigator.clipboard.writeText(markdown);
+      setFeedback({ kind: "success", text: "Approved brief copied." });
+    } catch {
+      setFeedback({ kind: "error", text: "Could not copy the approved brief." });
+    }
+  }
+
+  return (
+    <div className="approved-artifact-actions" aria-label="Human-approved artifact actions">
+      <div className="approved-artifact-buttons">
+        <a
+          className="download-button"
+          href={downloadHref}
+          download={getApprovedBriefFilename(workspace.brief?.title ?? "")}
+          onClick={() =>
+            setFeedback({ kind: "success", text: "Approved brief downloaded." })
+          }
+        >
+          Download approved brief (.md)
+        </a>
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={handleCopyApprovedBrief}
+        >
+          Copy approved brief
+        </button>
+      </div>
+      {feedback && (
+        <p
+          className={`copy-feedback ${feedback.kind}`}
+          role={feedback.kind === "error" ? "alert" : "status"}
+          aria-live="polite"
+        >
+          {feedback.text}
+        </p>
+      )}
+    </div>
   );
 }
 
