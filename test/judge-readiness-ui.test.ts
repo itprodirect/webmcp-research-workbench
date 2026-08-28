@@ -4,22 +4,27 @@ import test from "node:test";
 
 const page = readFileSync("app/page.tsx", "utf8");
 const workbench = readFileSync("app/components/search-workbench.tsx", "utf8");
+const researchCycle = readFileSync("src/client/research-cycle.ts", "utf8");
+const styles = readFileSync("app/globals.css", "utf8");
 
 test("judge-facing framing teaches the five-step human-agent workflow", () => {
   assert.match(page, /The agent gathers\. You decide what counts\./);
   assert.doesNotMatch(page, /Phase 2B/);
-  for (const step of [
-    "Define the mission",
-    "Researches sources",
-    "Accept the evidence",
-    "Drafts the brief",
-    "Review &amp; approve",
-  ]) {
-    assert.ok(page.includes(step));
+  for (const step of ["Define", "Research", "Curate", "Synthesize", "Approve"]) {
+    assert.ok(researchCycle.includes(`label: "${step}"`));
   }
   for (const role of ["Human", "Agent", "WebMCP"]) {
-    assert.match(page, new RegExp(`<h3>${role}</h3>`));
+    assert.match(workbench, new RegExp(`<h3>${role}</h3>`));
   }
+  assert.match(workbench, /<h2 id="research-cycle-heading">Research Cycle<\/h2>/);
+  assert.match(workbench, /aria-current=\{stageStatus === "current" \? "step" : undefined\}/);
+});
+
+test("mission-to-agent handoff copies a clipboard-only research prompt", () => {
+  assert.match(workbench, /navigator\.clipboard\.writeText\(AGENT_RESEARCH_PROMPT\)/);
+  assert.match(workbench, /Copy research prompt/);
+  assert.match(workbench, /Research prompt copied\./);
+  assert.match(workbench, /Could not copy the research prompt\./);
 });
 
 test("accepted evidence handoff copies the authorized prompt with accessible feedback", () => {
@@ -39,4 +44,19 @@ test("brief status reflects draft, human-reviewed, and approved states", () => {
     workbench,
     /const status = brief\.approved\s+\? "Human approved"\s+: brief\.human_reviewed\s+\? "Human reviewed — approval pending"\s+: "Agent draft — human review required";/,
   );
+});
+
+test("split-screen citations keep a fixed checkbox column and readable source copy", () => {
+  assert.match(workbench, /className="citation-option"/);
+  assert.match(workbench, /className="citation-copy"/);
+  assert.match(styles, /grid-template-columns: 1\.1rem minmax\(0, 1fr\)/);
+  assert.match(styles, /\.citation-options input\[type="checkbox"\]/);
+  assert.match(styles, /white-space: nowrap/);
+});
+
+test("brief review fields use dedicated readable sizing", () => {
+  for (const className of ["brief-summary", "finding-statement", "brief-caveats"]) {
+    assert.ok(workbench.includes(`className="${className}"`));
+    assert.match(styles, new RegExp(`\\.${className} \\{`));
+  }
 });

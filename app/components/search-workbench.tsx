@@ -17,8 +17,15 @@ import { MAX_MISSION_LENGTH } from "@/src/domain/workspace";
 import { searchSourcesViaServer } from "@/src/client/search-api";
 import { getSourceDetailsViaServer } from "@/src/client/source-details-api";
 import { workspaceStore } from "@/src/client/workspace-store";
+import {
+  deriveResearchCyclePresentation,
+  getResearchCycleStageStatus,
+  RESEARCH_CYCLE_STAGES,
+} from "@/src/client/research-cycle";
 
 const UI_RESULT_LIMIT = 5;
+const AGENT_RESEARCH_PROMPT =
+  "Open the WebMCP Research Workbench and read the active Research Mission. Search in both semantic and keyword modes where useful. Inspect the strongest candidates and propose up to three sources for human review. Prioritize direct relevance, provenance, recency where relevant, and open-access availability. Briefly explain why each source belongs in the evidence set, then stop and wait for human review. Do not accept evidence yourself.";
 const AGENT_SYNTHESIS_PROMPT =
   "In the WebMCP Research Workbench, read the current research workspace and draft the Evidence Brief for the active mission. Use only the human-accepted evidence already in the workspace when supporting or citing findings. Cite each finding to the accepted source IDs that support it, include relevant caveats about the limits of the evidence, and leave the result for human review. Do not mark it reviewed or approve it.";
 type RequestStatus = "idle" | "loading" | "success" | "error";
@@ -141,6 +148,9 @@ export function SearchWorkbench() {
 
   return (
     <div className="workbench-stack">
+      <ResearchCycle workspace={workspace} />
+      <RolesPanel />
+
       <MissionPanel
         mission={workspace.mission}
         onSubmit={handleMissionSubmit}
@@ -290,6 +300,134 @@ export function SearchWorkbench() {
 
       <ActivityPanel workspace={workspace} />
     </div>
+  );
+}
+
+function RolesPanel() {
+  return (
+    <section className="roles-panel" aria-labelledby="roles-heading">
+      <div className="compact-section-heading">
+        <p className="section-kicker">Who does what</p>
+        <h2 id="roles-heading">Human judgment, agent acceleration</h2>
+      </div>
+      <div className="role-grid">
+        <article className="role-card role-human">
+          <h3>Human</h3>
+          <p>
+            Set the research question, decide which sources become evidence, edit the
+            draft, review it, and give final approval.
+          </p>
+        </article>
+        <article className="role-card role-agent">
+          <h3>Agent</h3>
+          <p>
+            Searches OpenAlex, inspects source records, proposes evidence for your
+            review, and drafts a brief from the evidence you accepted.
+          </p>
+        </article>
+        <article className="role-card role-webmcp">
+          <h3>WebMCP</h3>
+          <p>
+            Gives the agent structured access to the same workspace and its declared
+            capabilities instead of requiring it to scrape the screen or imitate
+            human clicks.
+          </p>
+        </article>
+      </div>
+      <p className="runtime-note">
+        <strong>
+          The website does not run an embedded AI model; a WebMCP-enabled agent uses
+          the capabilities exposed by the workbench.
+        </strong>
+      </p>
+    </section>
+  );
+}
+
+function ResearchCycle({ workspace }: { workspace: ResearchWorkspaceState }) {
+  const presentation = deriveResearchCyclePresentation(workspace);
+  const [copyFeedback, setCopyFeedback] = useState<{
+    kind: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  async function handleCopyResearchPrompt() {
+    try {
+      if (!navigator.clipboard) {
+        throw new Error("Clipboard API unavailable.");
+      }
+      await navigator.clipboard.writeText(AGENT_RESEARCH_PROMPT);
+      setCopyFeedback({ kind: "success", text: "Research prompt copied." });
+    } catch {
+      setCopyFeedback({ kind: "error", text: "Could not copy the research prompt." });
+    }
+  }
+
+  return (
+    <section
+      id="research-cycle"
+      className={`research-cycle-panel research-cycle-${presentation.owner}`}
+      aria-labelledby="research-cycle-heading"
+    >
+      <div className="research-cycle-heading">
+        <div>
+          <p className="section-kicker">Live workspace position</p>
+          <h2 id="research-cycle-heading">Research Cycle</h2>
+        </div>
+        <span className="cycle-position">{presentation.turnLabel}</span>
+      </div>
+
+      <ol className="research-cycle-steps" aria-label="Research cycle progress">
+        {RESEARCH_CYCLE_STAGES.map((stage, index) => {
+          const stageStatus = getResearchCycleStageStatus(presentation, index);
+          const actorClass = stage.actor === "Human" ? "human" : "agent";
+          return (
+            <li
+              className={`research-cycle-stage cycle-stage-${stageStatus} cycle-stage-${actorClass}`}
+              key={stage.label}
+              aria-current={stageStatus === "current" ? "step" : undefined}
+            >
+              <span className="cycle-stage-marker" aria-hidden="true">
+                {stageStatus === "complete" ? "✓" : index + 1}
+              </span>
+              <strong className="cycle-stage-label">{stage.label}</strong>
+              <span className={`cycle-stage-actor cycle-actor-${actorClass}`}>
+                {stage.actor}
+              </span>
+              <span className="cycle-stage-status">
+                {stageStatus === "complete"
+                  ? "Complete"
+                  : stageStatus === "current"
+                    ? "Current"
+                    : "Upcoming"}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+
+      <div className={`cycle-next-action cycle-next-${presentation.owner}`} aria-live="polite">
+        <p className="cycle-turn-label">{presentation.turnLabel}</p>
+        <h3>{presentation.headline}</h3>
+        <p>{presentation.guidance}</p>
+        {presentation.state === "research" && (
+          <div className="cycle-copy-action">
+            <button type="button" onClick={handleCopyResearchPrompt}>
+              Copy research prompt
+            </button>
+            {copyFeedback && (
+              <p
+                className={`copy-feedback ${copyFeedback.kind}`}
+                role={copyFeedback.kind === "error" ? "alert" : "status"}
+                aria-live="polite"
+              >
+                {copyFeedback.text}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -828,7 +966,7 @@ function BriefPanel({
         </div>
         <div className="field full-field">
           <label htmlFor="brief-summary">Summary</label>
-          <textarea id="brief-summary" name="brief-summary" defaultValue={brief.summary} maxLength={1500} rows={4} required />
+          <textarea className="brief-summary" id="brief-summary" name="brief-summary" defaultValue={brief.summary} maxLength={1500} rows={6} required />
         </div>
         <div className="findings-editor">
           <h3>Findings</h3>
@@ -838,6 +976,7 @@ function BriefPanel({
               <div className="field full-field">
                 <label htmlFor={`finding-${index}-statement`}>Statement</label>
                 <textarea
+                  className="finding-statement"
                   id={`finding-${index}-statement`}
                   name={`finding-${index}-statement`}
                   defaultValue={finding.statement}
@@ -849,14 +988,18 @@ function BriefPanel({
               <div className="citation-options">
                 <span className="field-label">Accepted evidence citations</span>
                 {acceptedEvidence.map((source) => (
-                  <label key={source.id}>
+                  <label className="citation-option" key={source.id}>
                     <input
                       type="checkbox"
                       name={`finding-${index}-sources`}
                       value={source.id}
                       defaultChecked={finding.source_ids.includes(source.id)}
                     />
-                    <code>{source.id}</code> — {source.title ?? "Title unknown"}
+                    <span className="citation-copy">
+                      <code>{source.id}</code>
+                      <span aria-hidden="true"> — </span>
+                      <span>{source.title ?? "Title unknown"}</span>
+                    </span>
                   </label>
                 ))}
               </div>
@@ -865,7 +1008,7 @@ function BriefPanel({
         </div>
         <div className="field full-field">
           <label htmlFor="brief-caveats">Caveats</label>
-          <textarea id="brief-caveats" name="brief-caveats" defaultValue={brief.caveats} maxLength={1000} rows={3} />
+          <textarea className="brief-caveats" id="brief-caveats" name="brief-caveats" defaultValue={brief.caveats} maxLength={1000} rows={5} />
         </div>
         <div className="form-actions">
           <button type="submit">Save human edits</button>
