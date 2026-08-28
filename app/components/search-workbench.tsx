@@ -1,22 +1,34 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
+import type { FormEvent, ReactNode } from "react";
 import type {
   SourceDetailsRecord,
   SourceRecord,
 } from "@/src/domain/source-record";
+import type {
+  EvidenceBrief,
+  ResearchMission,
+  ResearchWorkspaceState,
+  WorkspaceEvidence,
+} from "@/src/domain/workspace";
+import type { SearchMode } from "@/src/domain/search-input";
+import { MAX_MISSION_LENGTH } from "@/src/domain/workspace";
 import { searchSourcesViaServer } from "@/src/client/search-api";
 import { getSourceDetailsViaServer } from "@/src/client/source-details-api";
-import {
-  addSourceToPacket,
-  removeSourceFromPacket,
-} from "@/src/client/research-packet";
+import { workspaceStore } from "@/src/client/workspace-store";
 
 const UI_RESULT_LIMIT = 5;
 type RequestStatus = "idle" | "loading" | "success" | "error";
 
 export function SearchWorkbench() {
+  const workspace = useSyncExternalStore(
+    workspaceStore.subscribe,
+    workspaceStore.getSnapshot,
+    workspaceStore.getServerSnapshot,
+  );
   const [query, setQuery] = useState("");
+  const [mode, setMode] = useState<SearchMode>("keyword");
   const [results, setResults] = useState<SourceRecord[]>([]);
   const [status, setStatus] = useState<RequestStatus>("idle");
   const [error, setError] = useState("");
@@ -24,9 +36,46 @@ export function SearchWorkbench() {
   const [details, setDetails] = useState<SourceDetailsRecord | null>(null);
   const [detailsStatus, setDetailsStatus] = useState<RequestStatus>("idle");
   const [detailsError, setDetailsError] = useState("");
-  const [packet, setPacket] = useState<SourceDetailsRecord[]>([]);
+  const [workspaceMessage, setWorkspaceMessage] = useState<{
+    kind: "success" | "error";
+    text: string;
+  } | null>(null);
   const activeRequest = useRef<AbortController | null>(null);
   const activeDetailsRequest = useRef<AbortController | null>(null);
+
+  function performWorkspaceAction(action: () => void, success: string) {
+    try {
+      action();
+      setWorkspaceMessage({ kind: "success", text: success });
+    } catch (caught) {
+      setWorkspaceMessage({
+        kind: "error",
+        text: caught instanceof Error ? caught.message : "Workspace action failed.",
+      });
+    }
+  }
+
+  function handleMissionSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    performWorkspaceAction(
+      () =>
+        workspaceStore.setMission({
+          question: String(form.get("question") ?? ""),
+          context: String(form.get("context") ?? ""),
+          evidence_max: Number(form.get("evidence_max")),
+        }),
+      workspace.mission ? "Research mission updated." : "Research mission set.",
+    );
+  }
+
+  function handleReset() {
+    if (!window.confirm("Reset the entire shared research workspace? This cannot be undone.")) {
+      return;
+    }
+    workspaceStore.reset();
+    setWorkspaceMessage({ kind: "success", text: "Shared workspace reset." });
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -43,7 +92,7 @@ export function SearchWorkbench() {
 
     try {
       const response = await searchSourcesViaServer(
-        { query, limit: UI_RESULT_LIMIT },
+        { query, mode, limit: UI_RESULT_LIMIT },
         controller.signal,
       );
       setResults(response.results);
@@ -88,63 +137,219 @@ export function SearchWorkbench() {
     }
   }
 
-  function handleAddToPacket(source: SourceDetailsRecord) {
-    setPacket((current) => addSourceToPacket(current, source));
-  }
-
-  function handleRemoveFromPacket(sourceId: string) {
-    setPacket((current) => removeSourceFromPacket(current, sourceId));
-  }
-
   return (
-    <section className="search-panel" aria-labelledby="search-heading">
-      <h2 id="search-heading">Search OpenAlex</h2>
-      <form className="search-form" onSubmit={handleSubmit}>
-        <label htmlFor="source-query">Research topic</label>
-        <input
-          id="source-query"
-          name="query"
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="e.g. browser agents"
-          maxLength={200}
-          required
-        />
-        <button type="submit" disabled={status === "loading"}>
-          {status === "loading" ? "Searching…" : "Search"}
-        </button>
-      </form>
-
-      <SearchStatus status={status} error={error} count={results.length} />
-
-      {results.length > 0 && (
-        <div className="results" aria-label="Search results">
-          {results.map((source) => (
-            <SourceResult
-              key={source.id}
-              source={source}
-              isLoading={
-                detailsStatus === "loading" && selectedSourceId === source.id
-              }
-              onInspect={handleInspect}
-            />
-          ))}
-        </div>
-      )}
-
-      <SourceDetailsPanel
-        sourceId={selectedSourceId}
-        source={details}
-        status={detailsStatus}
-        error={detailsError}
-        isInPacket={Boolean(
-          details && packet.some((member) => member.id === details.id),
-        )}
-        onAdd={handleAddToPacket}
+    <div className="workbench-stack">
+      <MissionPanel
+        mission={workspace.mission}
+        onSubmit={handleMissionSubmit}
+        onReset={handleReset}
       />
 
-      <ResearchPacket packet={packet} onRemove={handleRemoveFromPacket} />
+      {workspaceMessage && (
+        <p
+          className={`workspace-message ${workspaceMessage.kind}`}
+          role={workspaceMessage.kind === "error" ? "alert" : "status"}
+        >
+          {workspaceMessage.text}
+        </p>
+      )}
+
+      <section className="workspace-panel" aria-labelledby="search-heading">
+        <div className="section-heading">
+          <div>
+            <p className="section-kicker">Discover</p>
+            <h2 id="search-heading">Search / Source Inspection</h2>
+          </div>
+          <span className="provider-chip">OpenAlex only</span>
+        </div>
+        <form className="search-form" onSubmit={handleSubmit}>
+          <div className="field grow-field">
+            <label htmlFor="source-query">Research topic</label>
+            <input
+              id="source-query"
+              name="query"
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="e.g. indirect prompt injection in browser agents"
+              maxLength={mode === "semantic" ? 2000 : 200}
+              required
+            />
+          </div>
+          <div className="field mode-field">
+            <label htmlFor="search-mode">Mode</label>
+            <select
+              id="search-mode"
+              value={mode}
+              onChange={(event) => setMode(event.target.value as SearchMode)}
+            >
+              <option value="keyword">Keyword</option>
+              <option value="semantic">Semantic</option>
+            </select>
+          </div>
+          <button type="submit" disabled={status === "loading"}>
+            {status === "loading" ? "Searching…" : "Search"}
+          </button>
+        </form>
+        <p className="helper-text">
+          Semantic mode is hosted by OpenAlex through <code>search.semantic</code>;
+          keyword remains the default.
+        </p>
+
+        <SearchStatus status={status} error={error} count={results.length} mode={mode} />
+
+        {results.length > 0 && (
+          <div className="results" aria-label="Search results">
+            {results.map((source) => (
+              <SourceResult
+                key={source.id}
+                source={source}
+                isLoading={
+                  detailsStatus === "loading" && selectedSourceId === source.id
+                }
+                onInspect={handleInspect}
+              />
+            ))}
+          </div>
+        )}
+
+        <SourceDetailsPanel
+          sourceId={selectedSourceId}
+          source={details}
+          status={detailsStatus}
+          error={detailsError}
+          workspace={workspace}
+          onAccept={(source) =>
+            performWorkspaceAction(
+              () => workspaceStore.acceptInspectedEvidence(source),
+              `${source.id} accepted as evidence.`,
+            )
+          }
+        />
+      </section>
+
+      <ProposalPanel
+        workspace={workspace}
+        onAccept={(id) =>
+          performWorkspaceAction(
+            () => workspaceStore.acceptProposal(id),
+            `${id} accepted as evidence.`,
+          )
+        }
+        onReject={(id) =>
+          performWorkspaceAction(
+            () => workspaceStore.rejectProposal(id),
+            `${id} rejected.`,
+          )
+        }
+      />
+
+      <AcceptedEvidencePanel
+        evidence={workspace.accepted_evidence}
+        maximum={workspace.mission?.evidence_max ?? 0}
+        onRemove={(id) =>
+          performWorkspaceAction(
+            () => workspaceStore.removeAcceptedEvidence(id),
+            `${id} removed from accepted evidence.`,
+          )
+        }
+      />
+
+      <BriefPanel
+        brief={workspace.brief}
+        acceptedEvidence={workspace.accepted_evidence}
+        onEdit={(input) =>
+          performWorkspaceAction(
+            () => workspaceStore.editBrief(input),
+            "Human edits saved; review and approval reset.",
+          )
+        }
+        onReview={() =>
+          performWorkspaceAction(
+            () => workspaceStore.reviewBrief(),
+            "Evidence brief marked as human-reviewed.",
+          )
+        }
+        onApprove={() =>
+          performWorkspaceAction(
+            () => workspaceStore.approveBrief(),
+            "Evidence brief human-approved.",
+          )
+        }
+      />
+
+      <ActivityPanel workspace={workspace} />
+    </div>
+  );
+}
+
+function MissionPanel({
+  mission,
+  onSubmit,
+  onReset,
+}: {
+  mission: ResearchMission | null;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onReset: () => void;
+}) {
+  return (
+    <section className="workspace-panel mission-panel" aria-labelledby="mission-heading">
+      <div className="section-heading">
+        <div>
+          <p className="section-kicker">Human authority</p>
+          <h2 id="mission-heading">Research Mission</h2>
+        </div>
+        <span className="human-chip">Human-owned</span>
+      </div>
+      <p className="section-intro">
+        Only the visible human interface can set or change the mission. Reset before
+        changing a mission that already has evidence or a brief.
+      </p>
+      <form
+        className="mission-form"
+        key={mission?.updated_at ?? "empty-mission"}
+        onSubmit={onSubmit}
+      >
+        <div className="field full-field">
+          <label htmlFor="mission-question">Research question / mission <span aria-hidden="true">*</span></label>
+          <textarea
+            id="mission-question"
+            name="question"
+            defaultValue={mission?.question ?? ""}
+            maxLength={MAX_MISSION_LENGTH}
+            rows={3}
+            required
+          />
+        </div>
+        <div className="field full-field">
+          <label htmlFor="mission-context">Context or intended audience <span className="optional">optional</span></label>
+          <textarea
+            id="mission-context"
+            name="context"
+            defaultValue={mission?.context ?? ""}
+            maxLength={1000}
+            rows={2}
+          />
+        </div>
+        <div className="field evidence-limit-field">
+          <label htmlFor="evidence-max">Maximum accepted evidence</label>
+          <select
+            id="evidence-max"
+            name="evidence_max"
+            defaultValue={String(mission?.evidence_max ?? 3)}
+          >
+            {[1, 2, 3, 4, 5].map((value) => (
+              <option key={value} value={value}>{value}</option>
+            ))}
+          </select>
+        </div>
+        <div className="form-actions">
+          <button type="submit">{mission ? "Update mission" : "Set mission"}</button>
+          <button className="danger-button" type="button" onClick={onReset}>
+            Reset workspace
+          </button>
+        </div>
+      </form>
     </section>
   );
 }
@@ -153,16 +358,18 @@ function SearchStatus({
   status,
   error,
   count,
+  mode,
 }: {
   status: RequestStatus;
   error: string;
   count: number;
+  mode: SearchMode;
 }) {
   if (status === "idle") {
-    return <p className="status">Results are limited to {UI_RESULT_LIMIT} records.</p>;
+    return <p className="status">Results are limited to {UI_RESULT_LIMIT} compact records.</p>;
   }
   if (status === "loading") {
-    return <p className="status">Loading real OpenAlex data…</p>;
+    return <p className="status">Loading real OpenAlex {mode} results…</p>;
   }
   if (status === "error") {
     return <p className="status error" role="alert">{error}</p>;
@@ -187,7 +394,7 @@ function SourceResult({
   return (
     <article className="result-card">
       <code className="source-id">{source.id}</code>
-      <h2>{source.title ?? "Title unknown"}</h2>
+      <h3>{source.title ?? "Title unknown"}</h3>
       <p className="metadata">
         <span>Provider: {source.provider}</span>
         <span>Provider ID: {source.provider_record_id}</span>
@@ -204,16 +411,7 @@ function SourceResult({
         >
           {isLoading ? "Loading details…" : "Inspect source"}
         </button>
-        {externalUrl && (
-          <a
-            className="external-link"
-            href={externalUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            View provider record
-          </a>
-        )}
+        {externalUrl && <SafeExternalLink href={externalUrl}>View provider record</SafeExternalLink>}
       </div>
     </article>
   );
@@ -224,38 +422,36 @@ function SourceDetailsPanel({
   source,
   status,
   error,
-  isInPacket,
-  onAdd,
+  workspace,
+  onAccept,
 }: {
   sourceId: string | null;
   source: SourceDetailsRecord | null;
   status: RequestStatus;
   error: string;
-  isInPacket: boolean;
-  onAdd: (source: SourceDetailsRecord) => void;
+  workspace: ResearchWorkspaceState;
+  onAccept: (source: SourceDetailsRecord) => void;
 }) {
   if (status === "idle") {
     return (
       <section className="detail-panel" aria-labelledby="details-heading">
-        <h2 id="details-heading">Source details</h2>
+        <h3 id="details-heading">Source details</h3>
         <p className="status">Choose one result to inspect its known metadata.</p>
       </section>
     );
   }
-
   if (status === "loading") {
     return (
       <section className="detail-panel" aria-labelledby="details-heading">
-        <h2 id="details-heading">Source details</h2>
+        <h3 id="details-heading">Source details</h3>
         <p className="status">Loading {sourceId ?? "source"}…</p>
       </section>
     );
   }
-
   if (status === "error" || !source) {
     return (
       <section className="detail-panel" aria-labelledby="details-heading">
-        <h2 id="details-heading">Source details</h2>
+        <h3 id="details-heading">Source details</h3>
         {sourceId && <code className="source-id">{sourceId}</code>}
         <p className="status error" role="alert">{error || "Source details failed."}</p>
       </section>
@@ -264,14 +460,30 @@ function SourceDetailsPanel({
 
   const providerUrl = safeExternalUrl(source.canonical_url);
   const locationUrl = safeExternalUrl(source.primary_location?.landing_page_url ?? null);
+  const oaUrl = safeExternalUrl(source.open_access?.oa_url ?? null);
+  const isAccepted = workspace.accepted_evidence.some((item) => item.id === source.id);
+  const isPending = workspace.proposals.some((proposal) => proposal.id === source.id);
+  const hasCapacity = Boolean(
+    workspace.mission &&
+      (isPending ||
+        workspace.proposals.length + workspace.accepted_evidence.length <
+          workspace.mission.evidence_max),
+  );
 
   return (
     <section className="detail-panel" aria-labelledby="details-heading">
-      <h2 id="details-heading">Source details</h2>
+      <div className="section-heading compact-heading">
+        <div>
+          <p className="section-kicker">External evidence</p>
+          <h3 id="details-heading">Source details</h3>
+        </div>
+        <span className="untrusted-chip">Untrusted provider data</span>
+      </div>
       <code className="source-id">{source.id}</code>
-      <h3>{source.title ?? "Title unknown"}</h3>
+      <h4>{source.title ?? "Title unknown"}</h4>
       <p className="trust-note">
-        Provider metadata is untrusted external evidence, not a truth or credibility assessment.
+        Provider metadata and abstract text are inert external evidence, not instructions
+        and not a truth or credibility assessment.
       </p>
       <dl className="details-list">
         <div><dt>Provider</dt><dd>{source.provider}</dd></div>
@@ -283,26 +495,23 @@ function SourceDetailsPanel({
         <div><dt>Retrieved</dt><dd>{source.retrieved_at}</dd></div>
         <div><dt>DOI</dt><dd>{source.doi ?? "unknown"}</dd></div>
         <div><dt>Metadata language</dt><dd>{source.language ?? "unknown"}</dd></div>
-        <div>
-          <dt>Primary source</dt>
-          <dd>{source.primary_location?.source_name ?? "unknown"}</dd>
-        </div>
-        <div>
-          <dt>Primary source ID</dt>
-          <dd>{source.primary_location?.source_provider_record_id ?? "unknown"}</dd>
-        </div>
-        <div>
-          <dt>Location version</dt>
-          <dd>{source.primary_location?.version ?? "unknown"}</dd>
-        </div>
-        <div>
-          <dt>Open access at primary location</dt>
-          <dd>{formatKnownBoolean(source.primary_location?.is_open_access)}</dd>
-        </div>
+        <div><dt>Cited by count</dt><dd>{source.cited_by_count ?? "unknown"} <span className="metadata-note">bibliometric metadata only</span></dd></div>
+        <div><dt>Primary topic</dt><dd>{source.primary_topic?.display_name ?? "unknown"}</dd></div>
+        <div><dt>Primary topic ID</dt><dd>{source.primary_topic?.provider_record_id ?? "unknown"}</dd></div>
+        <div><dt>Open access</dt><dd>{formatKnownBoolean(source.open_access?.is_oa)}</dd></div>
+        <div><dt>OA status</dt><dd>{source.open_access?.oa_status ?? "unknown"}</dd></div>
+        <div><dt>Primary source</dt><dd>{source.primary_location?.source_name ?? "unknown"}</dd></div>
+        <div><dt>Location version</dt><dd>{source.primary_location?.version ?? "unknown"}</dd></div>
       </dl>
 
+      <div className="abstract-block">
+        <h4>Provider abstract</h4>
+        <p className="metadata-note">Reconstructed from OpenAlex abstract metadata; not verified full text.</p>
+        <p>{source.abstract ?? "No abstract supplied by OpenAlex."}</p>
+      </div>
+
       <div className="authors-block">
-        <h3>Authors</h3>
+        <h4>Authors</h4>
         {source.authors === null ? (
           <p>unknown</p>
         ) : source.authors.length === 0 ? (
@@ -325,55 +534,104 @@ function SourceDetailsPanel({
       <div className="card-actions">
         <button
           type="button"
-          onClick={() => onAdd(source)}
-          disabled={isInPacket}
+          onClick={() => onAccept(source)}
+          disabled={!workspace.mission || isAccepted || !hasCapacity}
         >
-          {isInPacket ? "Already in packet" : "Add to research packet"}
+          {!workspace.mission
+            ? "Set mission before accepting"
+            : isAccepted
+              ? "Already accepted"
+              : !hasCapacity
+                ? "Evidence limit reached"
+                : "Accept as evidence"}
         </button>
-        {providerUrl && (
-          <a
-            className="external-link"
-            href={providerUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            View provider record
-          </a>
-        )}
+        {providerUrl && <SafeExternalLink href={providerUrl}>View provider record</SafeExternalLink>}
         {locationUrl && locationUrl !== providerUrl && (
-          <a
-            className="external-link"
-            href={locationUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            View primary location
-          </a>
+          <SafeExternalLink href={locationUrl}>View primary location</SafeExternalLink>
+        )}
+        {oaUrl && oaUrl !== locationUrl && oaUrl !== providerUrl && (
+          <SafeExternalLink href={oaUrl}>View open-access location</SafeExternalLink>
         )}
       </div>
     </section>
   );
 }
 
-function ResearchPacket({
-  packet,
-  onRemove,
+function ProposalPanel({
+  workspace,
+  onAccept,
+  onReject,
 }: {
-  packet: SourceDetailsRecord[];
-  onRemove: (sourceId: string) => void;
+  workspace: ResearchWorkspaceState;
+  onAccept: (id: string) => void;
+  onReject: (id: string) => void;
 }) {
   return (
-    <section className="packet-panel" aria-labelledby="packet-heading">
-      <h2 id="packet-heading">Research packet ({packet.length})</h2>
-      <p className="status">
-        This packet exists only in this page&apos;s memory and clears on refresh.
-      </p>
-      {packet.length === 0 ? (
-        <p>No sources added.</p>
+    <section className="workspace-panel" aria-labelledby="proposals-heading">
+      <div className="section-heading">
+        <div>
+          <p className="section-kicker">Agent handoff</p>
+          <h2 id="proposals-heading">Agent Proposals ({workspace.proposals.length})</h2>
+        </div>
+        <span className="agent-chip">Human decision required</span>
+      </div>
+      {workspace.proposals.length === 0 ? (
+        <p className="empty-state">No evidence proposals are awaiting review.</p>
       ) : (
-        <div className="packet-list">
-          {packet.map((source) => (
-            <article className="packet-card" key={source.id}>
+        <div className="card-list">
+          {workspace.proposals.map((proposal) => (
+            <article className="proposal-card" key={proposal.id}>
+              <p className="proposal-status">Agent proposed — awaiting human review</p>
+              <code className="source-id">{proposal.id}</code>
+              <h3>{proposal.source.title ?? "Title unknown"}</h3>
+              {proposal.note && <p><strong>Agent note:</strong> {proposal.note}</p>}
+              <p className="metadata">
+                <span>Provider: {proposal.source.provider}</span>
+                <span>Published: {proposal.source.publication_date ?? "unknown"}</span>
+                <span>Cited by: {proposal.source.cited_by_count ?? "unknown"}</span>
+              </p>
+              {proposal.source.abstract && (
+                <details>
+                  <summary>Inspect provider abstract</summary>
+                  <p>{proposal.source.abstract}</p>
+                </details>
+              )}
+              <div className="card-actions">
+                <button type="button" onClick={() => onAccept(proposal.id)}>Accept evidence</button>
+                <button className="secondary-button" type="button" onClick={() => onReject(proposal.id)}>Reject</button>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function AcceptedEvidencePanel({
+  evidence,
+  maximum,
+  onRemove,
+}: {
+  evidence: WorkspaceEvidence[];
+  maximum: number;
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <section className="workspace-panel" aria-labelledby="accepted-heading">
+      <div className="section-heading">
+        <div>
+          <p className="section-kicker">Human-controlled membership</p>
+          <h2 id="accepted-heading">Accepted Evidence ({evidence.length}{maximum ? ` / ${maximum}` : ""})</h2>
+        </div>
+        <span className="human-chip">Human accepted</span>
+      </div>
+      {evidence.length === 0 ? (
+        <p className="empty-state">No human-accepted evidence yet.</p>
+      ) : (
+        <div className="card-list">
+          {evidence.map((source) => (
+            <article className="evidence-card" key={source.id}>
               <code className="source-id">{source.id}</code>
               <h3>{source.title ?? "Title unknown"}</h3>
               <p className="metadata">
@@ -382,18 +640,175 @@ function ResearchPacket({
                 <span>Published: {source.publication_date ?? "unknown"}</span>
                 <span>Retrieved: {source.retrieved_at}</span>
               </p>
-              <button
-                className="secondary-button"
-                type="button"
-                onClick={() => onRemove(source.id)}
-              >
-                Remove from packet
+              <button className="secondary-button" type="button" onClick={() => onRemove(source.id)}>
+                Remove accepted evidence
               </button>
             </article>
           ))}
         </div>
       )}
     </section>
+  );
+}
+
+function BriefPanel({
+  brief,
+  acceptedEvidence,
+  onEdit,
+  onReview,
+  onApprove,
+}: {
+  brief: EvidenceBrief | null;
+  acceptedEvidence: WorkspaceEvidence[];
+  onEdit: (input: unknown) => void;
+  onReview: () => void;
+  onApprove: () => void;
+}) {
+  if (!brief) {
+    return (
+      <section className="workspace-panel" aria-labelledby="brief-heading">
+        <div className="section-heading">
+          <div>
+            <p className="section-kicker">Synthesize</p>
+            <h2 id="brief-heading">Evidence Brief</h2>
+          </div>
+        </div>
+        <p className="empty-state">
+          No agent draft yet. The agent can draft only after at least one source is human-accepted.
+        </p>
+      </section>
+    );
+  }
+
+  function handleEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!brief) {
+      return;
+    }
+    const form = new FormData(event.currentTarget);
+    onEdit({
+      title: String(form.get("brief-title") ?? ""),
+      summary: String(form.get("brief-summary") ?? ""),
+      findings: brief.findings.map((_, index) => ({
+        statement: String(form.get(`finding-${index}-statement`) ?? ""),
+        source_ids: form.getAll(`finding-${index}-sources`).map(String),
+      })),
+      caveats: String(form.get("brief-caveats") ?? ""),
+    });
+  }
+
+  const status = brief.approved
+    ? "Human approved"
+    : brief.human_reviewed
+      ? "Human reviewed — approval pending"
+      : "Agent-generated draft — human review required";
+
+  return (
+    <section className="workspace-panel brief-panel" aria-labelledby="brief-heading">
+      <div className="section-heading">
+        <div>
+          <p className="section-kicker">Synthesize</p>
+          <h2 id="brief-heading">Evidence Brief</h2>
+        </div>
+        <span className={brief.approved ? "approved-chip" : "agent-chip"}>{status}</span>
+      </div>
+      <p className="trust-note">
+        Based on provider metadata and abstracts, not verified full-text review.
+      </p>
+      {brief.human_edited && <p className="human-edit-note">Human edits are present.</p>}
+      <form className="brief-form" key={brief.updated_at} onSubmit={handleEdit}>
+        <div className="field full-field">
+          <label htmlFor="brief-title">Title</label>
+          <input id="brief-title" name="brief-title" defaultValue={brief.title} maxLength={200} required />
+        </div>
+        <div className="field full-field">
+          <label htmlFor="brief-summary">Summary</label>
+          <textarea id="brief-summary" name="brief-summary" defaultValue={brief.summary} maxLength={1500} rows={4} required />
+        </div>
+        <div className="findings-editor">
+          <h3>Findings</h3>
+          {brief.findings.map((finding, index) => (
+            <fieldset className="finding-fieldset" key={`${brief.updated_at}-${index}`}>
+              <legend>Finding {index + 1}</legend>
+              <div className="field full-field">
+                <label htmlFor={`finding-${index}-statement`}>Statement</label>
+                <textarea
+                  id={`finding-${index}-statement`}
+                  name={`finding-${index}-statement`}
+                  defaultValue={finding.statement}
+                  maxLength={1000}
+                  rows={3}
+                  required
+                />
+              </div>
+              <div className="citation-options">
+                <span className="field-label">Accepted evidence citations</span>
+                {acceptedEvidence.map((source) => (
+                  <label key={source.id}>
+                    <input
+                      type="checkbox"
+                      name={`finding-${index}-sources`}
+                      value={source.id}
+                      defaultChecked={finding.source_ids.includes(source.id)}
+                    />
+                    <code>{source.id}</code> — {source.title ?? "Title unknown"}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ))}
+        </div>
+        <div className="field full-field">
+          <label htmlFor="brief-caveats">Caveats</label>
+          <textarea id="brief-caveats" name="brief-caveats" defaultValue={brief.caveats} maxLength={1000} rows={3} />
+        </div>
+        <div className="form-actions">
+          <button type="submit">Save human edits</button>
+          <button className="secondary-button" type="button" onClick={onReview}>
+            {brief.human_reviewed ? "Reviewed" : "Mark reviewed"}
+          </button>
+          <button type="button" onClick={onApprove} disabled={!brief.human_reviewed || brief.approved}>
+            {brief.approved ? "Approved" : "Approve brief"}
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+}
+
+function ActivityPanel({ workspace }: { workspace: ResearchWorkspaceState }) {
+  return (
+    <section className="workspace-panel" aria-labelledby="activity-heading">
+      <div className="section-heading">
+        <div>
+          <p className="section-kicker">Collaboration trail</p>
+          <h2 id="activity-heading">Activity ({workspace.activity.length})</h2>
+        </div>
+        <span className="provider-chip">Newest last · max 20</span>
+      </div>
+      {workspace.activity.length === 0 ? (
+        <p className="empty-state">No workspace activity yet.</p>
+      ) : (
+        <ol className="activity-list">
+          {workspace.activity.map((event, index) => (
+            <li key={`${event.timestamp}-${event.action}-${event.source_id ?? "none"}-${index}`}>
+              <span className={`actor actor-${event.actor}`}>{event.actor}</span>
+              <span>{formatActivity(event.action)}</span>
+              {event.source_id && <code>{event.source_id}</code>}
+              <time dateTime={event.timestamp}>{formatTimestamp(event.timestamp)}</time>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+function SafeExternalLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <a className="external-link" href={href} target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
   );
 }
 
@@ -414,4 +829,15 @@ function safeExternalUrl(value: string | null): string | null {
   } catch {
     return null;
   }
+}
+
+function formatActivity(action: string): string {
+  return action.replaceAll("_", " ");
+}
+
+function formatTimestamp(timestamp: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(timestamp));
 }

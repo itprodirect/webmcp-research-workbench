@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "WebMCP Research Workbench",
-  description: "A bounded OpenAlex-backed source inspection and curation workbench.",
+  description: "A human-authorized OpenAlex evidence mission shared with WebMCP agents.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

@@ -24,6 +24,10 @@ function source(id: string): SourceDetailsRecord {
     authors: null,
     language: null,
     primary_location: null,
+    abstract: null,
+    cited_by_count: null,
+    open_access: null,
+    primary_topic: null,
   };
 }
 

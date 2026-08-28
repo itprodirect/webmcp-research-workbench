@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { SourceDetailsRecord, SourceRecord } from "../domain/source-record.ts";
+import type { SearchMode } from "../domain/search-input.ts";
 import { SearchSourcesError } from "../domain/search-error.ts";
 import { SourceDetailsError } from "../domain/source-details-error.ts";
 import {
@@ -11,6 +12,7 @@ import {
 
 const OPENALEX_WORKS_ENDPOINT = "https://api.openalex.org/works";
 const OPENALEX_TIMEOUT_MS = 8_000;
+const SEMANTIC_REQUEST_INTERVAL_MS = 1_000;
 const MAX_PROVIDER_RESPONSE_BYTES = 256_000;
 const SELECTED_FIELDS = [
   "id",
@@ -26,21 +28,33 @@ const DETAIL_SELECTED_FIELDS = [
   "authorships",
   "language",
   "primary_location",
+  "abstract_inverted_index",
+  "cited_by_count",
+  "open_access",
+  "primary_topic",
 ].join(",");
 
 interface OpenAlexSearchInput {
   query: string;
   limit: number;
+  mode: SearchMode;
   signal?: AbortSignal;
 }
+
+let lastSemanticRequestAt = 0;
+let semanticRateQueue = Promise.resolve();
 
 export async function searchOpenAlex({
   query,
   limit,
+  mode,
   signal: callerSignal,
 }: OpenAlexSearchInput): Promise<SourceRecord[]> {
+  if (mode === "semantic") {
+    await waitForSemanticRequestSlot(callerSignal);
+  }
   const url = new URL(OPENALEX_WORKS_ENDPOINT);
-  url.searchParams.set("search", query);
+  url.searchParams.set(mode === "semantic" ? "search.semantic" : "search", query);
   url.searchParams.set("per_page", String(limit));
   url.searchParams.set("select", SELECTED_FIELDS);
 
@@ -116,6 +130,57 @@ export async function searchOpenAlex({
     }
     throw error;
   }
+}
+
+async function waitForSemanticRequestSlot(signal?: AbortSignal): Promise<void> {
+  let releaseQueue: () => void = () => undefined;
+  const previous = semanticRateQueue;
+  semanticRateQueue = new Promise<void>((resolve) => {
+    releaseQueue = resolve;
+  });
+
+  await previous;
+  try {
+    const waitMs = Math.max(
+      0,
+      SEMANTIC_REQUEST_INTERVAL_MS - (Date.now() - lastSemanticRequestAt),
+    );
+    if (waitMs > 0) {
+      await abortableDelay(waitMs, signal);
+    }
+    lastSemanticRequestAt = Date.now();
+  } finally {
+    releaseQueue();
+  }
+}
+
+async function abortableDelay(milliseconds: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) {
+    throw new SearchSourcesError(
+      "provider_failure",
+      502,
+      "OpenAlex semantic search was aborted before request dispatch.",
+      "openalex",
+    );
+  }
+  await new Promise<void>((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(
+        new SearchSourcesError(
+          "provider_failure",
+          502,
+          "OpenAlex semantic search was aborted before request dispatch.",
+          "openalex",
+        ),
+      );
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, milliseconds);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 export async function getOpenAlexWork(

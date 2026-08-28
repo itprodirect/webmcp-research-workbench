@@ -38,14 +38,30 @@ export interface SourcePrimaryLocation {
   is_open_access: boolean | null;
 }
 
+export interface SourceOpenAccess {
+  is_oa: boolean | null;
+  oa_status: string | null;
+  oa_url: string | null;
+}
+
+export interface SourcePrimaryTopic {
+  provider_record_id: string | null;
+  display_name: string | null;
+}
+
 export interface SourceDetailsRecord extends SourceRecord {
   authors: SourceAuthor[] | null;
   language: string | null;
   primary_location: SourcePrimaryLocation | null;
+  abstract: string | null;
+  cited_by_count: number | null;
+  open_access: SourceOpenAccess | null;
+  primary_topic: SourcePrimaryTopic | null;
 }
 
 export interface SearchSourcesResult {
   query: string;
+  mode: "keyword" | "semantic";
   limit: number;
   results: SourceRecord[];
 }
