@@ -46,8 +46,8 @@ main {
 }
 
 .page-header {
-  max-width: 800px;
-  margin-bottom: 2rem;
+  max-width: 880px;
+  margin-bottom: 1.5rem;
 }
 
 .eyebrow,
@@ -62,9 +62,18 @@ main {
 
 h1 {
   margin: 0;
-  font-size: clamp(2.25rem, 7vw, 4.25rem);
+  max-width: 820px;
+  font-size: clamp(2.15rem, 6vw, 3.7rem);
   letter-spacing: -0.04em;
-  line-height: 1;
+  line-height: 1.02;
+}
+
+.product-name {
+  margin: 0 0 0.5rem;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
 }
 
 h2,
@@ -89,6 +98,123 @@ h4 {
   background: rgba(255, 255, 255, 0.55);
   color: var(--muted);
   font-size: 0.82rem;
+}
+
+.workflow-panel,
+.roles-panel {
+  margin-bottom: 1.25rem;
+  padding: clamp(1rem, 3vw, 1.35rem);
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.compact-section-heading {
+  margin-bottom: 0.9rem;
+}
+
+.compact-section-heading h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.workflow-steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1.1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workflow-steps li {
+  position: relative;
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  gap: 0.45rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+
+.workflow-steps li:not(:last-child)::after {
+  position: absolute;
+  top: 50%;
+  right: -0.9rem;
+  color: var(--muted);
+  content: "→";
+  font-weight: 800;
+  transform: translateY(-50%);
+}
+
+.workflow-actor {
+  width: fit-content;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.workflow-human {
+  background: var(--human-soft);
+  color: var(--human);
+}
+
+.workflow-agent {
+  background: var(--agent-soft);
+  color: var(--agent);
+}
+
+.role-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.role-card {
+  min-width: 0;
+  padding: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+
+.role-card h3,
+.role-card p {
+  margin: 0;
+}
+
+.role-card h3 {
+  margin-bottom: 0.35rem;
+  font-size: 1rem;
+}
+
+.role-card p,
+.runtime-note {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.role-human {
+  border-top: 3px solid var(--human);
+}
+
+.role-agent {
+  border-top: 3px solid var(--agent);
+}
+
+.role-webmcp {
+  border-top: 3px solid var(--accent);
+}
+
+.runtime-note {
+  margin: 0.85rem 0 0;
 }
 
 .workbench-stack {
@@ -131,7 +257,8 @@ h4 {
 .helper-text,
 .empty-state,
 .status,
-.metadata-note {
+.metadata-note,
+.authority-note {
   color: var(--muted);
 }
 
@@ -141,8 +268,18 @@ h4 {
 }
 
 .helper-text,
-.metadata-note {
+.metadata-note,
+.authority-note,
+.example-text {
   font-size: 0.86rem;
+}
+
+.example-text {
+  margin: 0.35rem 0;
+}
+
+.authority-note {
+  margin: 0.75rem 0 1rem;
 }
 
 .provider-chip,
@@ -316,6 +453,29 @@ button:disabled {
   gap: 0.75rem;
 }
 
+.search-mode-guide {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.85rem;
+}
+
+.search-mode-guide p {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.search-mode-guide strong {
+  color: var(--text);
+}
+
 .grow-field {
   flex: 1 1 500px;
 }
@@ -411,6 +571,37 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.compact-details-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem 1rem;
+  margin: 0.75rem 0 0;
+}
+
+.compact-details-list div {
+  min-width: 0;
+}
+
+.compact-details-list dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.compact-details-list dd {
+  margin: 0.1rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.provenance-disclosure {
+  padding-top: 0.1rem;
+}
+
+.provenance-disclosure .details-list {
+  margin-top: 0.85rem;
+}
+
 .abstract-block,
 .authors-block {
   margin-top: 1.2rem;
@@ -444,6 +635,63 @@ summary {
 
 .brief-panel {
   border-top: 4px solid var(--agent);
+}
+
+.handoff-panel {
+  border-top: 4px solid var(--agent);
+  background: linear-gradient(135deg, var(--surface) 0%, var(--agent-soft) 180%);
+}
+
+.handoff-state h3,
+.handoff-state p {
+  margin-top: 0;
+}
+
+.handoff-state p {
+  max-width: 760px;
+}
+
+.copy-feedback {
+  display: inline-block;
+  margin: 0 0 0 0.75rem;
+  color: var(--approved);
+  font-weight: 800;
+}
+
+.copy-feedback.error {
+  color: var(--error);
+}
+
+.human-handoff {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border-left: 4px solid var(--human);
+  background: var(--human-soft);
+}
+
+.human-handoff p {
+  margin: 0;
+}
+
+.human-handoff ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.7rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-weight: 800;
+}
+
+.human-handoff li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.human-handoff li:not(:last-child)::after {
+  color: var(--human);
+  content: "→";
 }
 
 .human-edit-note {
@@ -561,6 +809,25 @@ summary {
     flex-direction: column;
   }
 
+  .workflow-steps,
+  .role-grid,
+  .search-mode-guide,
+  .compact-details-list {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-steps {
+    gap: 1.25rem;
+  }
+
+  .workflow-steps li:not(:last-child)::after {
+    top: auto;
+    right: 50%;
+    bottom: -1.15rem;
+    content: "↓";
+    transform: translateX(50%);
+  }
+
   .provider-chip,
   .human-chip,
   .agent-chip,
@@ -586,5 +853,10 @@ summary {
   .activity-list code,
   .activity-list time {
     grid-column: 2;
+  }
+
+  .copy-feedback {
+    display: block;
+    margin: 0.65rem 0 0;
   }
 }

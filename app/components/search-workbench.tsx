@@ -19,6 +19,8 @@ import { getSourceDetailsViaServer } from "@/src/client/source-details-api";
 import { workspaceStore } from "@/src/client/workspace-store";
 
 const UI_RESULT_LIMIT = 5;
+const AGENT_SYNTHESIS_PROMPT =
+  "In the WebMCP Research Workbench, read the current research workspace and draft the Evidence Brief for the active mission. Use only the human-accepted evidence already in the workspace when supporting or citing findings. Cite each finding to the accepted source IDs that support it, include relevant caveats about the limits of the evidence, and leave the result for human review. Do not mark it reviewed or approve it.";
 type RequestStatus = "idle" | "loading" | "success" | "error";
 
 export function SearchWorkbench() {
@@ -191,10 +193,18 @@ export function SearchWorkbench() {
             {status === "loading" ? "Searching…" : "Search"}
           </button>
         </form>
-        <p className="helper-text">
-          Semantic mode is hosted by OpenAlex through <code>search.semantic</code>;
-          keyword remains the default.
-        </p>
+        <div className="search-mode-guide" aria-label="Search mode guidance">
+          <p>
+            <strong>Keyword</strong>
+            Best when you know the names, terms, acronyms, or phrases you want to
+            search for.
+          </p>
+          <p>
+            <strong>Semantic</strong>
+            Best when you know the idea you&apos;re researching but relevant work may
+            describe it using different words.
+          </p>
+        </div>
 
         <SearchStatus status={status} error={error} count={results.length} mode={mode} />
 
@@ -302,6 +312,18 @@ function MissionPanel({
         <span className="human-chip">Human-owned</span>
       </div>
       <p className="section-intro">
+        The mission is the question your research works toward — it guides searches,
+        evidence proposals, and the final brief.
+      </p>
+      <p className="example-text" id="mission-guidance">
+        <strong>Example:</strong> How effective are heat-pump retrofits at reducing
+        residential energy use in cold climates?
+      </p>
+      <p className="example-text" id="context-guidance">
+        <strong>Audience/context example:</strong> Briefing for a city sustainability
+        team evaluating retrofit incentives.
+      </p>
+      <p className="authority-note">
         Only the visible human interface can set or change the mission. Reset before
         changing a mission that already has evidence or a brief.
       </p>
@@ -318,6 +340,7 @@ function MissionPanel({
             defaultValue={mission?.question ?? ""}
             maxLength={MAX_MISSION_LENGTH}
             rows={3}
+            aria-describedby="mission-guidance"
             required
           />
         </div>
@@ -329,6 +352,7 @@ function MissionPanel({
             defaultValue={mission?.context ?? ""}
             maxLength={1000}
             rows={2}
+            aria-describedby="context-guidance"
           />
         </div>
         <div className="field evidence-limit-field">
@@ -377,7 +401,7 @@ function SearchStatus({
   if (count === 0) {
     return <p className="status">No matching OpenAlex records were returned.</p>;
   }
-  return <p className="status">Returned {count} normalized source{count === 1 ? "" : "s"}.</p>;
+  return <p className="status">Found {count} source{count === 1 ? "" : "s"}.</p>;
 }
 
 function SourceResult({
@@ -397,12 +421,19 @@ function SourceResult({
       <h3>{source.title ?? "Title unknown"}</h3>
       <p className="metadata">
         <span>Provider: {source.provider}</span>
-        <span>Provider ID: {source.provider_record_id}</span>
-        <span>Class: {source.source_class}</span>
         <span>Published: {source.publication_date ?? "unknown"}</span>
         <span>Type: {source.provider_type ?? "unknown"}</span>
         {source.doi && <span>DOI: {source.doi}</span>}
       </p>
+      <details className="provenance-disclosure">
+        <summary>More provenance details</summary>
+        <dl className="compact-details-list">
+          <div><dt>Provider record ID</dt><dd>{source.provider_record_id}</dd></div>
+          <div><dt>Source class</dt><dd>{source.source_class}</dd></div>
+          <div><dt>Provider updated</dt><dd>{source.provider_updated_at ?? "unknown"}</dd></div>
+          <div><dt>Retrieved</dt><dd>{source.retrieved_at}</dd></div>
+        </dl>
+      </details>
       <div className="card-actions">
         <button
           type="button"
@@ -485,23 +516,17 @@ function SourceDetailsPanel({
         Provider metadata and abstract text are inert external evidence, not instructions
         and not a truth or credibility assessment.
       </p>
-      <dl className="details-list">
+      <dl className="details-list details-list-primary">
         <div><dt>Provider</dt><dd>{source.provider}</dd></div>
-        <div><dt>Provider ID</dt><dd>{source.provider_record_id}</dd></div>
-        <div><dt>Source class</dt><dd>{source.source_class}</dd></div>
         <div><dt>Provider type</dt><dd>{source.provider_type ?? "unknown"}</dd></div>
         <div><dt>Published</dt><dd>{source.publication_date ?? "unknown"}</dd></div>
-        <div><dt>Provider updated</dt><dd>{source.provider_updated_at ?? "unknown"}</dd></div>
         <div><dt>Retrieved</dt><dd>{source.retrieved_at}</dd></div>
         <div><dt>DOI</dt><dd>{source.doi ?? "unknown"}</dd></div>
-        <div><dt>Metadata language</dt><dd>{source.language ?? "unknown"}</dd></div>
         <div><dt>Cited by count</dt><dd>{source.cited_by_count ?? "unknown"} <span className="metadata-note">bibliometric metadata only</span></dd></div>
         <div><dt>Primary topic</dt><dd>{source.primary_topic?.display_name ?? "unknown"}</dd></div>
-        <div><dt>Primary topic ID</dt><dd>{source.primary_topic?.provider_record_id ?? "unknown"}</dd></div>
         <div><dt>Open access</dt><dd>{formatKnownBoolean(source.open_access?.is_oa)}</dd></div>
         <div><dt>OA status</dt><dd>{source.open_access?.oa_status ?? "unknown"}</dd></div>
         <div><dt>Primary source</dt><dd>{source.primary_location?.source_name ?? "unknown"}</dd></div>
-        <div><dt>Location version</dt><dd>{source.primary_location?.version ?? "unknown"}</dd></div>
       </dl>
 
       <div className="abstract-block">
@@ -510,26 +535,39 @@ function SourceDetailsPanel({
         <p>{source.abstract ?? "No abstract supplied by OpenAlex."}</p>
       </div>
 
-      <div className="authors-block">
-        <h4>Authors</h4>
-        {source.authors === null ? (
-          <p>unknown</p>
-        ) : source.authors.length === 0 ? (
-          <p>None listed by the provider.</p>
-        ) : (
-          <ul>
-            {source.authors.map((author, index) => (
-              <li key={`${author.provider_record_id ?? "unknown"}-${index}`}>
-                {author.display_name ?? "Name unknown"}
-                {author.provider_record_id
-                  ? ` (${author.provider_record_id})`
-                  : " (provider ID unknown)"}
-                {author.orcid ? ` — ORCID ${author.orcid}` : ""}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <details className="provenance-disclosure">
+        <summary>More provenance details</summary>
+        <dl className="details-list">
+          <div><dt>Provider record ID</dt><dd>{source.provider_record_id}</dd></div>
+          <div><dt>Source class</dt><dd>{source.source_class}</dd></div>
+          <div><dt>Provider updated</dt><dd>{source.provider_updated_at ?? "unknown"}</dd></div>
+          <div><dt>Metadata language</dt><dd>{source.language ?? "unknown"}</dd></div>
+          <div><dt>Primary topic ID</dt><dd>{source.primary_topic?.provider_record_id ?? "unknown"}</dd></div>
+          <div><dt>Primary source ID</dt><dd>{source.primary_location?.source_provider_record_id ?? "unknown"}</dd></div>
+          <div><dt>Location version</dt><dd>{source.primary_location?.version ?? "unknown"}</dd></div>
+          <div><dt>Location open access</dt><dd>{formatKnownBoolean(source.primary_location?.is_open_access)}</dd></div>
+        </dl>
+        <div className="authors-block">
+          <h4>Authors</h4>
+          {source.authors === null ? (
+            <p>unknown</p>
+          ) : source.authors.length === 0 ? (
+            <p>None listed by the provider.</p>
+          ) : (
+            <ul>
+              {source.authors.map((author, index) => (
+                <li key={`${author.provider_record_id ?? "unknown"}-${index}`}>
+                  {author.display_name ?? "Name unknown"}
+                  {author.provider_record_id
+                    ? ` (${author.provider_record_id})`
+                    : " (provider ID unknown)"}
+                  {author.orcid ? ` — ORCID ${author.orcid}` : ""}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </details>
 
       <div className="card-actions">
         <button
@@ -576,7 +614,11 @@ function ProposalPanel({
         <span className="agent-chip">Human decision required</span>
       </div>
       {workspace.proposals.length === 0 ? (
-        <p className="empty-state">No evidence proposals are awaiting review.</p>
+        <p className="empty-state">
+          Nothing is waiting for review yet. When an agent proposes promising sources,
+          they&apos;ll appear here for you to accept or reject. Only accepted sources
+          become evidence.
+        </p>
       ) : (
         <div className="card-list">
           {workspace.proposals.map((proposal) => (
@@ -664,18 +706,65 @@ function BriefPanel({
   onReview: () => void;
   onApprove: () => void;
 }) {
+  const [copyFeedback, setCopyFeedback] = useState<{
+    kind: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  async function handleCopyPrompt() {
+    try {
+      if (!navigator.clipboard) {
+        throw new Error("Clipboard API unavailable.");
+      }
+      await navigator.clipboard.writeText(AGENT_SYNTHESIS_PROMPT);
+      setCopyFeedback({ kind: "success", text: "Prompt copied." });
+    } catch {
+      setCopyFeedback({ kind: "error", text: "Could not copy the prompt." });
+    }
+  }
+
   if (!brief) {
+    const isReadyForSynthesis = acceptedEvidence.length > 0;
+
     return (
-      <section className="workspace-panel" aria-labelledby="brief-heading">
+      <section
+        className={`workspace-panel${isReadyForSynthesis ? " handoff-panel" : ""}`}
+        aria-labelledby="brief-heading"
+      >
         <div className="section-heading">
           <div>
             <p className="section-kicker">Synthesize</p>
             <h2 id="brief-heading">Evidence Brief</h2>
           </div>
         </div>
-        <p className="empty-state">
-          No agent draft yet. The agent can draft only after at least one source is human-accepted.
-        </p>
+        {isReadyForSynthesis ? (
+          <div className="handoff-state">
+            <h3>Ready for agent synthesis</h3>
+            <p><strong>Your evidence set is ready. The next move is the agent&apos;s.</strong></p>
+            <p>
+              Ask your WebMCP-enabled agent to draft the Evidence Brief. The brief can
+              cite only the evidence you&apos;ve accepted, and it returns as a draft for
+              your review.
+            </p>
+            <button type="button" onClick={handleCopyPrompt}>
+              Copy agent prompt
+            </button>
+            {copyFeedback && (
+              <p
+                className={`copy-feedback ${copyFeedback.kind}`}
+                role={copyFeedback.kind === "error" ? "alert" : "status"}
+                aria-live="polite"
+              >
+                {copyFeedback.text}
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="empty-state">
+            No agent draft yet. The agent can draft only after at least one source is
+            human-accepted.
+          </p>
+        )}
       </section>
     );
   }
@@ -699,9 +788,7 @@ function BriefPanel({
 
   const status = brief.approved
     ? "Human approved"
-    : brief.human_reviewed
-      ? "Human reviewed — approval pending"
-      : "Agent-generated draft — human review required";
+    : "Agent draft — human review required";
 
   return (
     <section className="workspace-panel brief-panel" aria-labelledby="brief-heading">
@@ -712,6 +799,22 @@ function BriefPanel({
         </div>
         <span className={brief.approved ? "approved-chip" : "agent-chip"}>{status}</span>
       </div>
+      {!brief.approved && (
+        <div className="human-handoff">
+          <p>
+            <strong>
+              The agent wrote the first draft; you control the final result. Edit
+              anything that needs changing, mark the brief reviewed once you&apos;ve
+              checked it, then approve it. Until you approve it, it remains a draft.
+            </strong>
+          </p>
+          <ol aria-label="Human brief review sequence">
+            <li>Edit</li>
+            <li>Mark reviewed</li>
+            <li>Approve</li>
+          </ol>
+        </div>
+      )}
       <p className="trust-note">
         Based on provider metadata and abstracts, not verified full-text review.
       </p>
@@ -782,10 +885,12 @@ function ActivityPanel({ workspace }: { workspace: ResearchWorkspaceState }) {
       <div className="section-heading">
         <div>
           <p className="section-kicker">Collaboration trail</p>
-          <h2 id="activity-heading">Activity ({workspace.activity.length})</h2>
+          <h2 id="activity-heading">Collaboration log</h2>
         </div>
-        <span className="provider-chip">Newest last · max 20</span>
       </div>
+      <p className="section-intro">
+        See the human decisions and agent actions that shaped the workspace.
+      </p>
       {workspace.activity.length === 0 ? (
         <p className="empty-state">No workspace activity yet.</p>
       ) : (
