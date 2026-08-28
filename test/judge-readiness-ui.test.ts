@@ -33,3 +33,10 @@ test("accepted evidence handoff copies the authorized prompt with accessible fee
   assert.match(workbench, /Could not copy the prompt\./);
   assert.match(workbench, /role=\{copyFeedback\.kind === "error" \? "alert" : "status"\}/);
 });
+
+test("brief status reflects draft, human-reviewed, and approved states", () => {
+  assert.match(
+    workbench,
+    /const status = brief\.approved\s+\? "Human approved"\s+: brief\.human_reviewed\s+\? "Human reviewed — approval pending"\s+: "Agent draft — human review required";/,
+  );
+});

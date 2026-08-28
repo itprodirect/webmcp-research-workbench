@@ -788,7 +788,9 @@ function BriefPanel({
 
   const status = brief.approved
     ? "Human approved"
-    : "Agent draft — human review required";
+    : brief.human_reviewed
+      ? "Human reviewed — approval pending"
+      : "Agent draft — human review required";
 
   return (
     <section className="workspace-panel brief-panel" aria-labelledby="brief-heading">
