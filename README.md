@@ -8,6 +8,8 @@ evidence membership and conclusions.
 
 <https://webmcp-research-workbench.vercel.app/>
 
+**V0 status:** `WEBMCP RESEARCH WORKBENCH V0 — PRODUCT FROZEN FOR SUBMISSION`
+
 ## Why WebMCP
 
 WebMCP gives an enabled agent five declared, structured capabilities against the
@@ -37,6 +39,22 @@ uses the capabilities exposed by the workbench.
 
 **Define → Agent researches → Human accepts → Agent synthesizes → Human approves**
 
+1. The human defines the research mission.
+2. The human tells the agent what to research; the agent works through WebMCP.
+3. The human curates the proposed evidence.
+4. The human tells the agent to continue and synthesize from the accepted evidence.
+5. The agent drafts using only human-accepted evidence.
+6. The human saves any edits, marks the brief reviewed, and approves it.
+7. The approved Markdown can be downloaded or copied.
+
+The optional **Copy example instruction** action remains available as onboarding or
+fallback, but copying a prompt is not the required or default interaction model.
+
+## Workbench HUD
+
+A persistent unified HUD keeps the current **Research Cycle** status and live
+**WebMCP** activity available while the human and agent move through the workspace.
+
 ## Exactly five WebMCP tools
 
 1. `get_research_workspace` — reads the mission and compact workspace state.
@@ -65,14 +83,18 @@ uses the capabilities exposed by the workbench.
 
 1. **Human UI:** Open the live application in an environment with WebMCP support
    enabled and define the visible Research Mission.
-2. **Agent:** Ask the agent to read the shared workspace.
-3. **Agent:** Have it search, inspect, and propose promising OpenAlex evidence.
+2. **Agent:** Tell the agent what to research and ask it to stop when human evidence
+   review is required.
+3. **Agent:** Let it read the workspace, search, inspect, and propose promising
+   OpenAlex evidence through WebMCP.
 4. **Human UI:** Accept or reject the proposals.
-5. **Human UI:** Once evidence is accepted, use **Copy agent prompt** in the ready-for-
-   synthesis state.
-6. **Agent:** Send that prompt so the agent drafts the Evidence Brief through WebMCP.
-7. **Human UI:** Edit the draft, mark it reviewed, and approve it.
-8. **Human UI:** Inspect the Collaboration log to see the human and agent handoffs.
+5. **Agent:** Tell the agent to continue and synthesize from only the accepted
+   evidence.
+6. **Human UI:** Save any edits, mark the brief reviewed, and approve it.
+7. **Human UI:** Download or copy the approved Markdown artifact.
+
+The unified HUD keeps the Research Cycle position and live WebMCP activity visible
+throughout the handoffs.
 
 ## Local development
 
@@ -85,6 +107,18 @@ Open <http://localhost:3000/>.
 
 ## Validation
 
+Accepted frozen V0 validation at
+`7b3b500529c08c2c35d51a50228d088d802cdd83`:
+
+- `npm test` — 74/74 PASS
+- `npm run lint` — PASS
+- `npm run build` — PASS
+- independent Claude HUD review — ACCEPT
+- independent Claude demo-usability review — ACCEPT
+- production smoke validation — PASS
+
+Run the local validators with:
+
 ```bash
 npm test
 npm run lint
@@ -95,12 +129,15 @@ npm run build
 
 WebMCP tool discovery and invocation require a browser or client environment with
 WebMCP support enabled. The repository does not claim universal client or browser-
-version compatibility. The accepted production validation used the supported Codex
-In-app Browser available during Phase 2B; that environment exposed neither a browser
-version nor a user agent. See the deployment evidence for the exact observations and
-limitations.
+version compatibility. The historical Phase 2A and Phase 2B deployment records
+capture the supported Codex In-app Browser observations and limitations at those
+gates. The frozen V0 was subsequently exercised on public production in Windows
+ChatGPT Work; see the dogfood records for those observations.
 
 ## Documentation
+
+Documents 00–17 preserve the planning and phase chronology. They remain historical
+evidence where later V0 decisions supersede their earlier expectations.
 
 1. [Project brief](docs/00-project-brief.md)
 2. [WebMCP Challenge requirements](docs/01-webmcp-challenge-requirements.md)
@@ -109,7 +146,7 @@ limitations.
 5. [WebMCP tool design](docs/04-webmcp-tool-design.md)
 6. [Security boundaries](docs/05-security-boundaries.md)
 7. [Technical Gate and MVP success criteria](docs/06-mvp-success-criteria.md)
-8. [Demo plan](docs/07-demo-plan.md)
+8. [Original demo plan — historical planning artifact; final plan pending](docs/07-demo-plan.md)
 9. [Build backlog](docs/08-build-backlog.md)
 10. [Decision log](docs/09-decision-log.md)
 11. [Technical Gate evidence](docs/10-technical-gate-evidence.md)
@@ -120,6 +157,9 @@ limitations.
 16. [Phase 2B deployment validation](docs/15-phase-2b-deployment-validation.md)
 17. [Phase 2B closeout](docs/16-phase-2b-closeout.md)
 18. [First human manual walkthrough](docs/17-first-human-manual-walkthrough.md)
+19. [Dogfood Ledger V0](docs/18-dogfood-ledger-v0.md)
+20. [Dogfood After-Action Report V0](docs/19-dogfood-after-action-report-v0.md)
+21. [V0 Product Freeze](docs/20-v0-product-freeze.md)
 
 ## License
 
