@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent, ReactNode } from "react";
 import type {
   SourceDetailsRecord,
@@ -23,6 +23,7 @@ import {
 } from "@/src/client/approved-brief-markdown";
 import {
   deriveResearchCyclePresentation,
+  getResearchCycleActionTargetId,
   getResearchCycleStageStatus,
   RESEARCH_CYCLE_STAGES,
 } from "@/src/client/research-cycle";
@@ -377,6 +378,8 @@ function RolesPanel() {
 
 function ResearchCycle({ workspace }: { workspace: ResearchWorkspaceState }) {
   const presentation = deriveResearchCyclePresentation(workspace);
+  const panelRef = useRef<HTMLElement | null>(null);
+  const [showCompactDock, setShowCompactDock] = useState(false);
   const webMcpActivity = useSyncExternalStore(
     webMcpActivityStore.subscribe,
     webMcpActivityStore.getSnapshot,
@@ -390,6 +393,40 @@ function ResearchCycle({ workspace }: { workspace: ResearchWorkspaceState }) {
     kind: "success" | "error";
     text: string;
   } | null>(null);
+
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setShowCompactDock(
+          !entry.isIntersecting && entry.boundingClientRect.bottom <= 0,
+        );
+      },
+      { threshold: 0 },
+    );
+    observer.observe(panel);
+    return () => observer.disconnect();
+  }, []);
+
+  function handleJumpToCurrentAction() {
+    const target = document.getElementById(
+      getResearchCycleActionTargetId(presentation.state),
+    );
+    if (!target) {
+      return;
+    }
+    const reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    target.scrollIntoView({
+      behavior: reducedMotion ? "auto" : "smooth",
+      block: "start",
+    });
+  }
 
   async function handleCopyResearchPrompt() {
     try {
@@ -421,12 +458,24 @@ function ResearchCycle({ workspace }: { workspace: ResearchWorkspaceState }) {
     }
   }
 
+  const activeStageNumber = presentation.activeStageIndex === null
+    ? RESEARCH_CYCLE_STAGES.length
+    : presentation.activeStageIndex + 1;
+  const activeStageLabel = presentation.activeStageIndex === null
+    ? "Complete"
+    : RESEARCH_CYCLE_STAGES[presentation.activeStageIndex].label;
+  const compactOwnerLabel = presentation.owner === "complete"
+    ? "COMPLETE"
+    : presentation.turnLabel;
+
   return (
-    <section
-      id="research-cycle"
-      className={`research-cycle-panel research-cycle-${presentation.owner}`}
-      aria-labelledby="research-cycle-heading"
-    >
+    <>
+      <section
+        ref={panelRef}
+        id="research-cycle"
+        className={`research-cycle-panel research-cycle-${presentation.owner}`}
+        aria-labelledby="research-cycle-heading"
+      >
       <div className="research-cycle-heading">
         <div>
           <p className="section-kicker">Live workspace position</p>
@@ -514,11 +563,37 @@ function ResearchCycle({ workspace }: { workspace: ResearchWorkspaceState }) {
         <p className="cycle-next-cue">{presentation.nextStep}</p>
       </div>
 
-      <LiveWebMcpActivity
-        activity={webMcpActivity}
-        prominent={presentation.owner === "agent"}
-      />
-    </section>
+        <LiveWebMcpActivity
+          activity={webMcpActivity}
+          prominent={presentation.owner === "agent"}
+        />
+      </section>
+
+      {showCompactDock && (
+        <aside
+          className={`research-cycle-dock research-cycle-dock-${presentation.owner}`}
+          aria-label="Compact Research Cycle"
+          aria-live="polite"
+        >
+          <div className="cycle-dock-meta">
+            <span className="cycle-dock-owner">{compactOwnerLabel}</span>
+            <span className="cycle-dock-progress">
+              Stage {activeStageNumber} / {RESEARCH_CYCLE_STAGES.length}
+            </span>
+          </div>
+          <div className="cycle-dock-copy">
+            <strong>{activeStageLabel}</strong>
+            <span>{presentation.headline}</span>
+          </div>
+          <div className="cycle-dock-controls">
+            <WebMcpActivitySummary activity={webMcpActivity} />
+            <button type="button" onClick={handleJumpToCurrentAction}>
+              Jump to current action
+            </button>
+          </div>
+        </aside>
+      )}
+    </>
   );
 }
 
@@ -529,14 +604,6 @@ function LiveWebMcpActivity({
   activity: readonly WebMcpActivityEntry[];
   prominent: boolean;
 }) {
-  const completedCount = activity.filter(
-    (entry) => entry.status === "succeeded",
-  ).length;
-  const invocationCount = activity.reduce(
-    (total, entry) => total + entry.invocationCount,
-    0,
-  );
-
   return (
     <section
       className={`webmcp-activity ${prominent ? "webmcp-activity-prominent" : "webmcp-activity-compact"}`}
@@ -548,46 +615,79 @@ function LiveWebMcpActivity({
           <p className="section-kicker">Structured agent operations</p>
           <h3 id="webmcp-activity-heading">Live WebMCP Activity</h3>
         </div>
-        <span className="webmcp-activity-summary">
-          {invocationCount === 0
-            ? "Waiting"
-            : `${completedCount}/5 succeeded · ${invocationCount} call${invocationCount === 1 ? "" : "s"}`}
-        </span>
+        <WebMcpActivitySummary activity={activity} />
       </div>
       <p className="webmcp-activity-note">
         {prominent
           ? "Watch the five registered WebMCP tools as the agent performs this stage. This shows tool execution, not private reasoning."
           : "Agent tool activity is paused while control is with you. This browser-local summary resets on reload."}
       </p>
-      {prominent && (
-        <ol className="webmcp-activity-list">
-          {activity.map((entry) => (
-            <li
-              className={`webmcp-activity-item webmcp-activity-${entry.status}`}
-              key={entry.name}
-            >
-              <span className="webmcp-activity-marker" aria-hidden="true">
-                {activityMarker(entry.status)}
-              </span>
-              <span className="webmcp-activity-copy">
-                <strong>
-                  <code>{entry.name}</code>
-                  {entry.invocationCount > 1 && (
-                    <span className="webmcp-invocation-count">
-                      ×{entry.invocationCount}
-                    </span>
-                  )}
-                </strong>
-                <span>{entry.label}</span>
-              </span>
-              <span className="webmcp-activity-status">
-                {activityStatusLabel(entry.status)}
-              </span>
-            </li>
-          ))}
-        </ol>
+      {prominent ? (
+        <WebMcpActivityList activity={activity} />
+      ) : (
+        <details className="webmcp-activity-disclosure">
+          <summary>View activity</summary>
+          <WebMcpActivityList activity={activity} />
+        </details>
       )}
     </section>
+  );
+}
+
+function WebMcpActivitySummary({
+  activity,
+}: {
+  activity: readonly WebMcpActivityEntry[];
+}) {
+  const completedCount = activity.filter(
+    (entry) => entry.status === "succeeded",
+  ).length;
+  const invocationCount = activity.reduce(
+    (total, entry) => total + entry.invocationCount,
+    0,
+  );
+
+  return (
+    <span className="webmcp-activity-summary">
+      {invocationCount === 0
+        ? "WebMCP waiting"
+        : `${completedCount}/5 tools · ${invocationCount} call${invocationCount === 1 ? "" : "s"}`}
+    </span>
+  );
+}
+
+function WebMcpActivityList({
+  activity,
+}: {
+  activity: readonly WebMcpActivityEntry[];
+}) {
+  return (
+    <ol className="webmcp-activity-list">
+      {activity.map((entry) => (
+        <li
+          className={`webmcp-activity-item webmcp-activity-${entry.status}`}
+          key={entry.name}
+        >
+          <span className="webmcp-activity-marker" aria-hidden="true">
+            {activityMarker(entry.status)}
+          </span>
+          <span className="webmcp-activity-copy">
+            <strong>
+              <code>{entry.name}</code>
+              {entry.invocationCount > 1 && (
+                <span className="webmcp-invocation-count">
+                  ×{entry.invocationCount}
+                </span>
+              )}
+            </strong>
+            <span>{entry.label}</span>
+          </span>
+          <span className="webmcp-activity-status">
+            {activityStatusLabel(entry.status)}
+          </span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -638,7 +738,11 @@ function ApprovedBriefActions({ workspace }: { workspace: ResearchWorkspaceState
   }
 
   return (
-    <div className="approved-artifact-actions" aria-label="Human-approved artifact actions">
+    <div
+      id="approved-brief-actions"
+      className="approved-artifact-actions"
+      aria-label="Human-approved artifact actions"
+    >
       <div className="approved-artifact-buttons">
         <a
           className="download-button"

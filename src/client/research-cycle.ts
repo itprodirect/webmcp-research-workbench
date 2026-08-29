@@ -143,3 +143,22 @@ export function getResearchCycleStageStatus(
   }
   return stageIndex < (presentation.activeStageIndex ?? 0) ? "complete" : "future";
 }
+
+export function getResearchCycleActionTargetId(
+  state: ResearchCycleState,
+): string {
+  switch (state) {
+    case "define":
+      return "mission-heading";
+    case "research":
+      return "research-cycle";
+    case "curate":
+      return "proposals-heading";
+    case "synthesize":
+    case "review":
+    case "approve":
+      return "brief-heading";
+    case "complete":
+      return "approved-brief-actions";
+  }
+}

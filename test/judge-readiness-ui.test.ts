@@ -64,6 +64,25 @@ test("every Research Cycle action includes an explicit next-step cue", () => {
   assert.match(workbench, /Copy agent prompt/);
 });
 
+test("the full cycle hands off to a compact, action-linked viewport dock", () => {
+  assert.match(workbench, /new IntersectionObserver/);
+  assert.match(workbench, /Compact Research Cycle/);
+  assert.match(workbench, /Stage \{activeStageNumber\} \/ \{RESEARCH_CYCLE_STAGES\.length\}/);
+  assert.match(workbench, /Jump to current action/);
+  assert.match(workbench, /getResearchCycleActionTargetId\(presentation\.state\)/);
+  assert.match(workbench, /scrollIntoView/);
+  assert.match(workbench, /prefers-reduced-motion: reduce/);
+  assert.match(workbench, /id="approved-brief-actions"/);
+  assert.match(styles, /\.research-cycle-dock/);
+  assert.doesNotMatch(styles, /\.research-cycle-panel \{\s*position: sticky;/);
+});
+
+test("human-owned WebMCP telemetry is summarized with an optional disclosure", () => {
+  assert.match(workbench, /webmcp-activity-disclosure/);
+  assert.match(workbench, /<summary>View activity<\/summary>/);
+  assert.match(workbench, /prominent \? \(/);
+});
+
 test("manual discovery is explicitly optional, agent-first, and collapsible", () => {
   assert.match(workbench, /Optional human source verification/);
   assert.match(workbench, /agent performs discovery during the Research stage through WebMCP/);

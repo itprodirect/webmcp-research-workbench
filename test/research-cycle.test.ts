@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   deriveResearchCyclePresentation,
+  getResearchCycleActionTargetId,
   getResearchCycleStageStatus,
 } from "../src/client/research-cycle.ts";
 import type {
@@ -92,4 +93,31 @@ test("pending evidence review takes precedence over an unapproved draft", () => 
 
   assert.equal(presentation.state, "curate");
   assert.equal(presentation.headline, "Review the agent's proposed evidence");
+});
+
+test("maps every presentation state to its existing human action surface", () => {
+  assert.deepEqual(
+    [
+      "define",
+      "research",
+      "curate",
+      "synthesize",
+      "review",
+      "approve",
+      "complete",
+    ].map((state) =>
+      getResearchCycleActionTargetId(
+        state as ReturnType<typeof deriveResearchCyclePresentation>["state"],
+      ),
+    ),
+    [
+      "mission-heading",
+      "research-cycle",
+      "proposals-heading",
+      "brief-heading",
+      "brief-heading",
+      "brief-heading",
+      "approved-brief-actions",
+    ],
+  );
 });
