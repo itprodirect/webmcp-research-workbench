@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent, ReactNode } from "react";
 import type {
   SourceDetailsRecord,
@@ -17,8 +17,26 @@ import { MAX_MISSION_LENGTH } from "@/src/domain/workspace";
 import { searchSourcesViaServer } from "@/src/client/search-api";
 import { getSourceDetailsViaServer } from "@/src/client/source-details-api";
 import { workspaceStore } from "@/src/client/workspace-store";
+import {
+  buildApprovedBriefMarkdown,
+  getApprovedBriefFilename,
+} from "@/src/client/approved-brief-markdown";
+import {
+  deriveResearchCyclePresentation,
+  getResearchCycleActionTargetId,
+  getResearchCycleStageStatus,
+  RESEARCH_CYCLE_STAGES,
+} from "@/src/client/research-cycle";
+import {
+  webMcpActivityStore,
+  type WebMcpActivityEntry,
+} from "@/src/client/webmcp-activity";
 
 const UI_RESULT_LIMIT = 5;
+const AGENT_RESEARCH_PROMPT =
+  "Open the WebMCP Research Workbench and read the active Research Mission. Search in both semantic and keyword modes where useful. Inspect the strongest candidates and propose up to three sources for human review. Prioritize direct relevance, provenance, recency where relevant, and open-access availability. Briefly explain why each source belongs in the evidence set, then stop and wait for human review. Do not accept evidence yourself.";
+const AGENT_SYNTHESIS_PROMPT =
+  "In the WebMCP Research Workbench, read the current research workspace and draft the Evidence Brief for the active mission. Use only the human-accepted evidence already in the workspace when supporting or citing findings. Cite each finding to the accepted source IDs that support it, include relevant caveats about the limits of the evidence, and leave the result for human review. Do not mark it reviewed or approve it.";
 type RequestStatus = "idle" | "loading" | "success" | "error";
 
 export function SearchWorkbench() {
@@ -139,6 +157,9 @@ export function SearchWorkbench() {
 
   return (
     <div className="workbench-stack">
+      <ResearchCycle workspace={workspace} />
+      <RolesPanel />
+
       <MissionPanel
         mission={workspace.mission}
         onSubmit={handleMissionSubmit}
@@ -154,78 +175,109 @@ export function SearchWorkbench() {
         </p>
       )}
 
-      <section className="workspace-panel" aria-labelledby="search-heading">
+      <section
+        className="workspace-panel verification-panel"
+        aria-labelledby="search-heading"
+      >
         <div className="section-heading">
           <div>
-            <p className="section-kicker">Discover</p>
-            <h2 id="search-heading">Search / Source Inspection</h2>
+            <p className="section-kicker">Agent-first discovery</p>
+            <h2 id="search-heading">Optional human source verification</h2>
           </div>
           <span className="provider-chip">OpenAlex only</span>
         </div>
-        <form className="search-form" onSubmit={handleSubmit}>
-          <div className="field grow-field">
-            <label htmlFor="source-query">Research topic</label>
-            <input
-              id="source-query"
-              name="query"
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="e.g. indirect prompt injection in browser agents"
-              maxLength={mode === "semantic" ? 2000 : 200}
-              required
+        <div className="agent-discovery-note">
+          <p>
+            <strong>The agent performs discovery during the Research stage through WebMCP.</strong>
+          </p>
+          <p>
+            It may search OpenAlex in Keyword and Semantic modes and inspect candidate
+            records. Selected candidates enter the shared workspace under Agent
+            Proposals for your review. You do not need to repeat the agent&apos;s searches.
+          </p>
+        </div>
+        <details className="manual-verification">
+          <summary>
+            <span>
+              <strong>Open manual search and source inspection</strong>
+              <small>Optional — independently verify or explore OpenAlex sources.</small>
+            </span>
+          </summary>
+          <div className="manual-verification-content">
+            <form className="search-form" onSubmit={handleSubmit}>
+              <div className="field grow-field">
+                <label htmlFor="source-query">Research topic</label>
+                <input
+                  id="source-query"
+                  name="query"
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="e.g. indirect prompt injection in browser agents"
+                  maxLength={mode === "semantic" ? 2000 : 200}
+                  required
+                />
+              </div>
+              <div className="field mode-field">
+                <label htmlFor="search-mode">Mode</label>
+                <select
+                  id="search-mode"
+                  value={mode}
+                  onChange={(event) => setMode(event.target.value as SearchMode)}
+                >
+                  <option value="keyword">Keyword</option>
+                  <option value="semantic">Semantic</option>
+                </select>
+              </div>
+              <button type="submit" disabled={status === "loading"}>
+                {status === "loading" ? "Searching…" : "Search"}
+              </button>
+            </form>
+            <div className="search-mode-guide" aria-label="Search mode guidance">
+              <p>
+                <strong>Keyword</strong>
+                Best when you know the names, terms, acronyms, or phrases you want to
+                search for.
+              </p>
+              <p>
+                <strong>Semantic</strong>
+                Best when you know the idea you&apos;re researching but relevant work may
+                describe it using different words.
+              </p>
+            </div>
+
+            <SearchStatus status={status} error={error} count={results.length} mode={mode} />
+
+            {results.length > 0 && (
+              <div className="results" aria-label="Search results">
+                {results.map((source) => (
+                  <SourceResult
+                    key={source.id}
+                    source={source}
+                    isLoading={
+                      detailsStatus === "loading" && selectedSourceId === source.id
+                    }
+                    onInspect={handleInspect}
+                  />
+                ))}
+              </div>
+            )}
+
+            <SourceDetailsPanel
+              sourceId={selectedSourceId}
+              source={details}
+              status={detailsStatus}
+              error={detailsError}
+              workspace={workspace}
+              onAccept={(source) =>
+                performWorkspaceAction(
+                  () => workspaceStore.acceptInspectedEvidence(source),
+                  `${source.id} accepted as evidence.`,
+                )
+              }
             />
           </div>
-          <div className="field mode-field">
-            <label htmlFor="search-mode">Mode</label>
-            <select
-              id="search-mode"
-              value={mode}
-              onChange={(event) => setMode(event.target.value as SearchMode)}
-            >
-              <option value="keyword">Keyword</option>
-              <option value="semantic">Semantic</option>
-            </select>
-          </div>
-          <button type="submit" disabled={status === "loading"}>
-            {status === "loading" ? "Searching…" : "Search"}
-          </button>
-        </form>
-        <p className="helper-text">
-          Semantic mode is hosted by OpenAlex through <code>search.semantic</code>;
-          keyword remains the default.
-        </p>
-
-        <SearchStatus status={status} error={error} count={results.length} mode={mode} />
-
-        {results.length > 0 && (
-          <div className="results" aria-label="Search results">
-            {results.map((source) => (
-              <SourceResult
-                key={source.id}
-                source={source}
-                isLoading={
-                  detailsStatus === "loading" && selectedSourceId === source.id
-                }
-                onInspect={handleInspect}
-              />
-            ))}
-          </div>
-        )}
-
-        <SourceDetailsPanel
-          sourceId={selectedSourceId}
-          source={details}
-          status={detailsStatus}
-          error={detailsError}
-          workspace={workspace}
-          onAccept={(source) =>
-            performWorkspaceAction(
-              () => workspaceStore.acceptInspectedEvidence(source),
-              `${source.id} accepted as evidence.`,
-            )
-          }
-        />
+        </details>
       </section>
 
       <ProposalPanel
@@ -283,6 +335,446 @@ export function SearchWorkbench() {
   );
 }
 
+function RolesPanel() {
+  return (
+    <section className="roles-panel" aria-labelledby="roles-heading">
+      <div className="compact-section-heading">
+        <p className="section-kicker">Who does what</p>
+        <h2 id="roles-heading">Human judgment, agent acceleration</h2>
+      </div>
+      <div className="role-grid">
+        <article className="role-card role-human">
+          <h3>Human</h3>
+          <p>
+            Set the research question, decide which sources become evidence, edit the
+            draft, review it, and give final approval.
+          </p>
+        </article>
+        <article className="role-card role-agent">
+          <h3>Agent</h3>
+          <p>
+            Searches OpenAlex, inspects source records, proposes evidence for your
+            review, and drafts a brief from the evidence you accepted.
+          </p>
+        </article>
+        <article className="role-card role-webmcp">
+          <h3>WebMCP</h3>
+          <p>
+            Gives the agent structured access to the same workspace and its declared
+            capabilities instead of requiring it to scrape the screen or imitate
+            human clicks.
+          </p>
+        </article>
+      </div>
+      <p className="runtime-note">
+        <strong>
+          The website does not run an embedded AI model; a WebMCP-enabled agent uses
+          the capabilities exposed by the workbench.
+        </strong>
+      </p>
+    </section>
+  );
+}
+
+function ResearchCycle({ workspace }: { workspace: ResearchWorkspaceState }) {
+  const presentation = deriveResearchCyclePresentation(workspace);
+  const panelRef = useRef<HTMLElement | null>(null);
+  const [showCompactDock, setShowCompactDock] = useState(false);
+  const webMcpActivity = useSyncExternalStore(
+    webMcpActivityStore.subscribe,
+    webMcpActivityStore.getSnapshot,
+    webMcpActivityStore.getServerSnapshot,
+  );
+  const [researchCopyFeedback, setResearchCopyFeedback] = useState<{
+    kind: "success" | "error";
+    text: string;
+  } | null>(null);
+  const [synthesisCopyFeedback, setSynthesisCopyFeedback] = useState<{
+    kind: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setShowCompactDock(
+          !entry.isIntersecting && entry.boundingClientRect.bottom <= 0,
+        );
+      },
+      { threshold: 0 },
+    );
+    observer.observe(panel);
+    return () => observer.disconnect();
+  }, []);
+
+  function handleJumpToCurrentAction() {
+    const target = document.getElementById(
+      getResearchCycleActionTargetId(presentation.state),
+    );
+    if (!target) {
+      return;
+    }
+    const reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    target.scrollIntoView({
+      behavior: reducedMotion ? "auto" : "smooth",
+      block: "start",
+    });
+  }
+
+  async function handleCopyResearchPrompt() {
+    try {
+      if (!navigator.clipboard) {
+        throw new Error("Clipboard API unavailable.");
+      }
+      await navigator.clipboard.writeText(AGENT_RESEARCH_PROMPT);
+      setResearchCopyFeedback({ kind: "success", text: "Research prompt copied." });
+    } catch {
+      setResearchCopyFeedback({
+        kind: "error",
+        text: "Could not copy the research prompt.",
+      });
+    }
+  }
+
+  async function handleCopySynthesisPrompt() {
+    try {
+      if (!navigator.clipboard) {
+        throw new Error("Clipboard API unavailable.");
+      }
+      await navigator.clipboard.writeText(AGENT_SYNTHESIS_PROMPT);
+      setSynthesisCopyFeedback({ kind: "success", text: "Synthesis prompt copied." });
+    } catch {
+      setSynthesisCopyFeedback({
+        kind: "error",
+        text: "Could not copy the synthesis prompt.",
+      });
+    }
+  }
+
+  const activeStageNumber = presentation.activeStageIndex === null
+    ? RESEARCH_CYCLE_STAGES.length
+    : presentation.activeStageIndex + 1;
+  const activeStageLabel = presentation.activeStageIndex === null
+    ? "Complete"
+    : RESEARCH_CYCLE_STAGES[presentation.activeStageIndex].label;
+  const compactOwnerLabel = presentation.owner === "complete"
+    ? "COMPLETE"
+    : presentation.turnLabel;
+
+  return (
+    <>
+      <section
+        ref={panelRef}
+        id="research-cycle"
+        className={`research-cycle-panel research-cycle-${presentation.owner}`}
+        aria-labelledby="research-cycle-heading"
+      >
+      <div className="research-cycle-heading">
+        <div>
+          <p className="section-kicker">Live workspace position</p>
+          <h2 id="research-cycle-heading">Research Cycle</h2>
+        </div>
+        <span className="cycle-position">{presentation.turnLabel}</span>
+      </div>
+
+      <ol className="research-cycle-steps" aria-label="Research cycle progress">
+        {RESEARCH_CYCLE_STAGES.map((stage, index) => {
+          const stageStatus = getResearchCycleStageStatus(presentation, index);
+          const actorClass = stage.actor === "Human" ? "human" : "agent";
+          return (
+            <li
+              className={`research-cycle-stage cycle-stage-${stageStatus} cycle-stage-${actorClass}`}
+              key={stage.label}
+              aria-current={stageStatus === "current" ? "step" : undefined}
+            >
+              <span className="cycle-stage-marker" aria-hidden="true">
+                {stageStatus === "complete" ? "✓" : index + 1}
+              </span>
+              <strong className="cycle-stage-label">{stage.label}</strong>
+              <span className={`cycle-stage-actor cycle-actor-${actorClass}`}>
+                {stage.actor}
+              </span>
+              <span className="cycle-stage-status">
+                {stageStatus === "complete"
+                  ? "Complete"
+                  : stageStatus === "current"
+                    ? "Current"
+                    : "Upcoming"}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+
+      <div className={`cycle-next-action cycle-next-${presentation.owner}`} aria-live="polite">
+        <p className="cycle-turn-label">{presentation.turnLabel}</p>
+        <h3>{presentation.headline}</h3>
+        <p>{presentation.guidance}</p>
+        {presentation.state === "research" && (
+          <ul className="cycle-agent-task-list">
+            <li>Read the shared workspace.</li>
+            <li>Use Keyword and Semantic OpenAlex search where useful.</li>
+            <li>Inspect candidate sources and compare their evidence context.</li>
+            <li>Propose a bounded evidence set, then stop for human review.</li>
+          </ul>
+        )}
+        {presentation.state === "research" && (
+          <div className="cycle-copy-action">
+            <button type="button" onClick={handleCopyResearchPrompt}>
+              Copy research prompt
+            </button>
+            {researchCopyFeedback && (
+              <p
+                className={`copy-feedback ${researchCopyFeedback.kind}`}
+                role={researchCopyFeedback.kind === "error" ? "alert" : "status"}
+                aria-live="polite"
+              >
+                {researchCopyFeedback.text}
+              </p>
+            )}
+          </div>
+        )}
+        {presentation.state === "synthesize" && (
+          <div className="cycle-copy-action">
+            <button type="button" onClick={handleCopySynthesisPrompt}>
+              Copy synthesis prompt
+            </button>
+            {synthesisCopyFeedback && (
+              <p
+                className={`copy-feedback ${synthesisCopyFeedback.kind}`}
+                role={synthesisCopyFeedback.kind === "error" ? "alert" : "status"}
+                aria-live="polite"
+              >
+                {synthesisCopyFeedback.text}
+              </p>
+            )}
+          </div>
+        )}
+        {presentation.state === "complete" && (
+          <ApprovedBriefActions workspace={workspace} />
+        )}
+        <p className="cycle-next-cue">{presentation.nextStep}</p>
+      </div>
+
+        <LiveWebMcpActivity
+          activity={webMcpActivity}
+          prominent={presentation.owner === "agent"}
+        />
+      </section>
+
+      {showCompactDock && (
+        <aside
+          className={`research-cycle-dock research-cycle-dock-${presentation.owner}`}
+          aria-label="Compact Research Cycle"
+          aria-live="polite"
+        >
+          <div className="cycle-dock-meta">
+            <span className="cycle-dock-owner">{compactOwnerLabel}</span>
+            <span className="cycle-dock-progress">
+              Stage {activeStageNumber} / {RESEARCH_CYCLE_STAGES.length}
+            </span>
+          </div>
+          <div className="cycle-dock-copy">
+            <strong>{activeStageLabel}</strong>
+            <span>{presentation.headline}</span>
+          </div>
+          <div className="cycle-dock-controls">
+            <WebMcpActivitySummary activity={webMcpActivity} />
+            <button type="button" onClick={handleJumpToCurrentAction}>
+              Jump to current action
+            </button>
+          </div>
+        </aside>
+      )}
+    </>
+  );
+}
+
+function LiveWebMcpActivity({
+  activity,
+  prominent,
+}: {
+  activity: readonly WebMcpActivityEntry[];
+  prominent: boolean;
+}) {
+  return (
+    <section
+      className={`webmcp-activity ${prominent ? "webmcp-activity-prominent" : "webmcp-activity-compact"}`}
+      aria-labelledby="webmcp-activity-heading"
+      aria-live="polite"
+    >
+      <div className="webmcp-activity-heading">
+        <div>
+          <p className="section-kicker">Structured agent operations</p>
+          <h3 id="webmcp-activity-heading">Live WebMCP Activity</h3>
+        </div>
+        <WebMcpActivitySummary activity={activity} />
+      </div>
+      <p className="webmcp-activity-note">
+        {prominent
+          ? "Watch the five registered WebMCP tools as the agent performs this stage. This shows tool execution, not private reasoning."
+          : "Agent tool activity is paused while control is with you. This browser-local summary resets on reload."}
+      </p>
+      {prominent ? (
+        <WebMcpActivityList activity={activity} />
+      ) : (
+        <details className="webmcp-activity-disclosure">
+          <summary>View activity</summary>
+          <WebMcpActivityList activity={activity} />
+        </details>
+      )}
+    </section>
+  );
+}
+
+function WebMcpActivitySummary({
+  activity,
+}: {
+  activity: readonly WebMcpActivityEntry[];
+}) {
+  const completedCount = activity.filter(
+    (entry) => entry.status === "succeeded",
+  ).length;
+  const invocationCount = activity.reduce(
+    (total, entry) => total + entry.invocationCount,
+    0,
+  );
+
+  return (
+    <span className="webmcp-activity-summary">
+      {invocationCount === 0
+        ? "WebMCP waiting"
+        : `${completedCount}/5 tools · ${invocationCount} call${invocationCount === 1 ? "" : "s"}`}
+    </span>
+  );
+}
+
+function WebMcpActivityList({
+  activity,
+}: {
+  activity: readonly WebMcpActivityEntry[];
+}) {
+  return (
+    <ol className="webmcp-activity-list">
+      {activity.map((entry) => (
+        <li
+          className={`webmcp-activity-item webmcp-activity-${entry.status}`}
+          key={entry.name}
+        >
+          <span className="webmcp-activity-marker" aria-hidden="true">
+            {activityMarker(entry.status)}
+          </span>
+          <span className="webmcp-activity-copy">
+            <strong>
+              <code>{entry.name}</code>
+              {entry.invocationCount > 1 && (
+                <span className="webmcp-invocation-count">
+                  ×{entry.invocationCount}
+                </span>
+              )}
+            </strong>
+            <span>{entry.label}</span>
+          </span>
+          <span className="webmcp-activity-status">
+            {activityStatusLabel(entry.status)}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function activityMarker(status: WebMcpActivityEntry["status"]) {
+  switch (status) {
+    case "running":
+      return "●";
+    case "succeeded":
+      return "✓";
+    case "failed":
+      return "!";
+    default:
+      return "○";
+  }
+}
+
+function activityStatusLabel(status: WebMcpActivityEntry["status"]) {
+  switch (status) {
+    case "running":
+      return "Running";
+    case "succeeded":
+      return "Succeeded";
+    case "failed":
+      return "Failed";
+    default:
+      return "Unused";
+  }
+}
+
+function ApprovedBriefActions({ workspace }: { workspace: ResearchWorkspaceState }) {
+  const [feedback, setFeedback] = useState<{
+    kind: "success" | "error";
+    text: string;
+  } | null>(null);
+  const markdown = buildApprovedBriefMarkdown(workspace);
+  const downloadHref = `data:text/markdown;charset=utf-8,${encodeURIComponent(markdown)}`;
+
+  async function handleCopyApprovedBrief() {
+    try {
+      if (!navigator.clipboard) {
+        throw new Error("Clipboard API unavailable.");
+      }
+      await navigator.clipboard.writeText(markdown);
+      setFeedback({ kind: "success", text: "Approved brief copied." });
+    } catch {
+      setFeedback({ kind: "error", text: "Could not copy the approved brief." });
+    }
+  }
+
+  return (
+    <div
+      id="approved-brief-actions"
+      className="approved-artifact-actions"
+      aria-label="Human-approved artifact actions"
+    >
+      <div className="approved-artifact-buttons">
+        <a
+          className="download-button"
+          href={downloadHref}
+          download={getApprovedBriefFilename(workspace.brief?.title ?? "")}
+          onClick={() =>
+            setFeedback({ kind: "success", text: "Approved brief downloaded." })
+          }
+        >
+          Download approved brief (.md)
+        </a>
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={handleCopyApprovedBrief}
+        >
+          Copy approved brief
+        </button>
+      </div>
+      {feedback && (
+        <p
+          className={`copy-feedback ${feedback.kind}`}
+          role={feedback.kind === "error" ? "alert" : "status"}
+          aria-live="polite"
+        >
+          {feedback.text}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function MissionPanel({
   mission,
   onSubmit,
@@ -302,6 +794,18 @@ function MissionPanel({
         <span className="human-chip">Human-owned</span>
       </div>
       <p className="section-intro">
+        The mission is the question your research works toward — it guides searches,
+        evidence proposals, and the final brief.
+      </p>
+      <p className="example-text" id="mission-guidance">
+        <strong>Example:</strong> How effective are heat-pump retrofits at reducing
+        residential energy use in cold climates?
+      </p>
+      <p className="example-text" id="context-guidance">
+        <strong>Audience/context example:</strong> Briefing for a city sustainability
+        team evaluating retrofit incentives.
+      </p>
+      <p className="authority-note">
         Only the visible human interface can set or change the mission. Reset before
         changing a mission that already has evidence or a brief.
       </p>
@@ -318,6 +822,7 @@ function MissionPanel({
             defaultValue={mission?.question ?? ""}
             maxLength={MAX_MISSION_LENGTH}
             rows={3}
+            aria-describedby="mission-guidance"
             required
           />
         </div>
@@ -329,6 +834,7 @@ function MissionPanel({
             defaultValue={mission?.context ?? ""}
             maxLength={1000}
             rows={2}
+            aria-describedby="context-guidance"
           />
         </div>
         <div className="field evidence-limit-field">
@@ -377,7 +883,7 @@ function SearchStatus({
   if (count === 0) {
     return <p className="status">No matching OpenAlex records were returned.</p>;
   }
-  return <p className="status">Returned {count} normalized source{count === 1 ? "" : "s"}.</p>;
+  return <p className="status">Found {count} source{count === 1 ? "" : "s"}.</p>;
 }
 
 function SourceResult({
@@ -397,12 +903,19 @@ function SourceResult({
       <h3>{source.title ?? "Title unknown"}</h3>
       <p className="metadata">
         <span>Provider: {source.provider}</span>
-        <span>Provider ID: {source.provider_record_id}</span>
-        <span>Class: {source.source_class}</span>
         <span>Published: {source.publication_date ?? "unknown"}</span>
         <span>Type: {source.provider_type ?? "unknown"}</span>
         {source.doi && <span>DOI: {source.doi}</span>}
       </p>
+      <details className="provenance-disclosure">
+        <summary>More provenance details</summary>
+        <dl className="compact-details-list">
+          <div><dt>Provider record ID</dt><dd>{source.provider_record_id}</dd></div>
+          <div><dt>Source class</dt><dd>{source.source_class}</dd></div>
+          <div><dt>Provider updated</dt><dd>{source.provider_updated_at ?? "unknown"}</dd></div>
+          <div><dt>Retrieved</dt><dd>{source.retrieved_at}</dd></div>
+        </dl>
+      </details>
       <div className="card-actions">
         <button
           type="button"
@@ -485,23 +998,17 @@ function SourceDetailsPanel({
         Provider metadata and abstract text are inert external evidence, not instructions
         and not a truth or credibility assessment.
       </p>
-      <dl className="details-list">
+      <dl className="details-list details-list-primary">
         <div><dt>Provider</dt><dd>{source.provider}</dd></div>
-        <div><dt>Provider ID</dt><dd>{source.provider_record_id}</dd></div>
-        <div><dt>Source class</dt><dd>{source.source_class}</dd></div>
         <div><dt>Provider type</dt><dd>{source.provider_type ?? "unknown"}</dd></div>
         <div><dt>Published</dt><dd>{source.publication_date ?? "unknown"}</dd></div>
-        <div><dt>Provider updated</dt><dd>{source.provider_updated_at ?? "unknown"}</dd></div>
         <div><dt>Retrieved</dt><dd>{source.retrieved_at}</dd></div>
         <div><dt>DOI</dt><dd>{source.doi ?? "unknown"}</dd></div>
-        <div><dt>Metadata language</dt><dd>{source.language ?? "unknown"}</dd></div>
         <div><dt>Cited by count</dt><dd>{source.cited_by_count ?? "unknown"} <span className="metadata-note">bibliometric metadata only</span></dd></div>
         <div><dt>Primary topic</dt><dd>{source.primary_topic?.display_name ?? "unknown"}</dd></div>
-        <div><dt>Primary topic ID</dt><dd>{source.primary_topic?.provider_record_id ?? "unknown"}</dd></div>
         <div><dt>Open access</dt><dd>{formatKnownBoolean(source.open_access?.is_oa)}</dd></div>
         <div><dt>OA status</dt><dd>{source.open_access?.oa_status ?? "unknown"}</dd></div>
         <div><dt>Primary source</dt><dd>{source.primary_location?.source_name ?? "unknown"}</dd></div>
-        <div><dt>Location version</dt><dd>{source.primary_location?.version ?? "unknown"}</dd></div>
       </dl>
 
       <div className="abstract-block">
@@ -510,26 +1017,39 @@ function SourceDetailsPanel({
         <p>{source.abstract ?? "No abstract supplied by OpenAlex."}</p>
       </div>
 
-      <div className="authors-block">
-        <h4>Authors</h4>
-        {source.authors === null ? (
-          <p>unknown</p>
-        ) : source.authors.length === 0 ? (
-          <p>None listed by the provider.</p>
-        ) : (
-          <ul>
-            {source.authors.map((author, index) => (
-              <li key={`${author.provider_record_id ?? "unknown"}-${index}`}>
-                {author.display_name ?? "Name unknown"}
-                {author.provider_record_id
-                  ? ` (${author.provider_record_id})`
-                  : " (provider ID unknown)"}
-                {author.orcid ? ` — ORCID ${author.orcid}` : ""}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <details className="provenance-disclosure">
+        <summary>More provenance details</summary>
+        <dl className="details-list">
+          <div><dt>Provider record ID</dt><dd>{source.provider_record_id}</dd></div>
+          <div><dt>Source class</dt><dd>{source.source_class}</dd></div>
+          <div><dt>Provider updated</dt><dd>{source.provider_updated_at ?? "unknown"}</dd></div>
+          <div><dt>Metadata language</dt><dd>{source.language ?? "unknown"}</dd></div>
+          <div><dt>Primary topic ID</dt><dd>{source.primary_topic?.provider_record_id ?? "unknown"}</dd></div>
+          <div><dt>Primary source ID</dt><dd>{source.primary_location?.source_provider_record_id ?? "unknown"}</dd></div>
+          <div><dt>Location version</dt><dd>{source.primary_location?.version ?? "unknown"}</dd></div>
+          <div><dt>Location open access</dt><dd>{formatKnownBoolean(source.primary_location?.is_open_access)}</dd></div>
+        </dl>
+        <div className="authors-block">
+          <h4>Authors</h4>
+          {source.authors === null ? (
+            <p>unknown</p>
+          ) : source.authors.length === 0 ? (
+            <p>None listed by the provider.</p>
+          ) : (
+            <ul>
+              {source.authors.map((author, index) => (
+                <li key={`${author.provider_record_id ?? "unknown"}-${index}`}>
+                  {author.display_name ?? "Name unknown"}
+                  {author.provider_record_id
+                    ? ` (${author.provider_record_id})`
+                    : " (provider ID unknown)"}
+                  {author.orcid ? ` — ORCID ${author.orcid}` : ""}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </details>
 
       <div className="card-actions">
         <button
@@ -576,7 +1096,11 @@ function ProposalPanel({
         <span className="agent-chip">Human decision required</span>
       </div>
       {workspace.proposals.length === 0 ? (
-        <p className="empty-state">No evidence proposals are awaiting review.</p>
+        <p className="empty-state">
+          Nothing is waiting for review yet. When an agent proposes promising sources,
+          they&apos;ll appear here for you to accept or reject. Only accepted sources
+          become evidence.
+        </p>
       ) : (
         <div className="card-list">
           {workspace.proposals.map((proposal) => (
@@ -664,18 +1188,65 @@ function BriefPanel({
   onReview: () => void;
   onApprove: () => void;
 }) {
+  const [copyFeedback, setCopyFeedback] = useState<{
+    kind: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  async function handleCopyPrompt() {
+    try {
+      if (!navigator.clipboard) {
+        throw new Error("Clipboard API unavailable.");
+      }
+      await navigator.clipboard.writeText(AGENT_SYNTHESIS_PROMPT);
+      setCopyFeedback({ kind: "success", text: "Prompt copied." });
+    } catch {
+      setCopyFeedback({ kind: "error", text: "Could not copy the prompt." });
+    }
+  }
+
   if (!brief) {
+    const isReadyForSynthesis = acceptedEvidence.length > 0;
+
     return (
-      <section className="workspace-panel" aria-labelledby="brief-heading">
+      <section
+        className={`workspace-panel${isReadyForSynthesis ? " handoff-panel" : ""}`}
+        aria-labelledby="brief-heading"
+      >
         <div className="section-heading">
           <div>
             <p className="section-kicker">Synthesize</p>
             <h2 id="brief-heading">Evidence Brief</h2>
           </div>
         </div>
-        <p className="empty-state">
-          No agent draft yet. The agent can draft only after at least one source is human-accepted.
-        </p>
+        {isReadyForSynthesis ? (
+          <div className="handoff-state">
+            <h3>Ready for agent synthesis</h3>
+            <p><strong>Your evidence set is ready. The next move is the agent&apos;s.</strong></p>
+            <p>
+              Ask your WebMCP-enabled agent to draft the Evidence Brief. The brief can
+              cite only the evidence you&apos;ve accepted, and it returns as a draft for
+              your review.
+            </p>
+            <button type="button" onClick={handleCopyPrompt}>
+              Copy agent prompt
+            </button>
+            {copyFeedback && (
+              <p
+                className={`copy-feedback ${copyFeedback.kind}`}
+                role={copyFeedback.kind === "error" ? "alert" : "status"}
+                aria-live="polite"
+              >
+                {copyFeedback.text}
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="empty-state">
+            No agent draft yet. The agent can draft only after at least one source is
+            human-accepted.
+          </p>
+        )}
       </section>
     );
   }
@@ -701,7 +1272,7 @@ function BriefPanel({
     ? "Human approved"
     : brief.human_reviewed
       ? "Human reviewed — approval pending"
-      : "Agent-generated draft — human review required";
+      : "Agent draft — human review required";
 
   return (
     <section className="workspace-panel brief-panel" aria-labelledby="brief-heading">
@@ -712,6 +1283,22 @@ function BriefPanel({
         </div>
         <span className={brief.approved ? "approved-chip" : "agent-chip"}>{status}</span>
       </div>
+      {!brief.approved && (
+        <div className="human-handoff">
+          <p>
+            <strong>
+              The agent wrote the first draft; you control the final result. Edit
+              anything that needs changing, mark the brief reviewed once you&apos;ve
+              checked it, then approve it. Until you approve it, it remains a draft.
+            </strong>
+          </p>
+          <ol aria-label="Human brief review sequence">
+            <li>Edit</li>
+            <li>Mark reviewed</li>
+            <li>Approve</li>
+          </ol>
+        </div>
+      )}
       <p className="trust-note">
         Based on provider metadata and abstracts, not verified full-text review.
       </p>
@@ -723,7 +1310,7 @@ function BriefPanel({
         </div>
         <div className="field full-field">
           <label htmlFor="brief-summary">Summary</label>
-          <textarea id="brief-summary" name="brief-summary" defaultValue={brief.summary} maxLength={1500} rows={4} required />
+          <textarea className="brief-summary" id="brief-summary" name="brief-summary" defaultValue={brief.summary} maxLength={1500} rows={6} required />
         </div>
         <div className="findings-editor">
           <h3>Findings</h3>
@@ -733,6 +1320,7 @@ function BriefPanel({
               <div className="field full-field">
                 <label htmlFor={`finding-${index}-statement`}>Statement</label>
                 <textarea
+                  className="finding-statement"
                   id={`finding-${index}-statement`}
                   name={`finding-${index}-statement`}
                   defaultValue={finding.statement}
@@ -744,14 +1332,18 @@ function BriefPanel({
               <div className="citation-options">
                 <span className="field-label">Accepted evidence citations</span>
                 {acceptedEvidence.map((source) => (
-                  <label key={source.id}>
+                  <label className="citation-option" key={source.id}>
                     <input
                       type="checkbox"
                       name={`finding-${index}-sources`}
                       value={source.id}
                       defaultChecked={finding.source_ids.includes(source.id)}
                     />
-                    <code>{source.id}</code> — {source.title ?? "Title unknown"}
+                    <span className="citation-copy">
+                      <code>{source.id}</code>
+                      <span aria-hidden="true"> — </span>
+                      <span>{source.title ?? "Title unknown"}</span>
+                    </span>
                   </label>
                 ))}
               </div>
@@ -760,7 +1352,7 @@ function BriefPanel({
         </div>
         <div className="field full-field">
           <label htmlFor="brief-caveats">Caveats</label>
-          <textarea id="brief-caveats" name="brief-caveats" defaultValue={brief.caveats} maxLength={1000} rows={3} />
+          <textarea className="brief-caveats" id="brief-caveats" name="brief-caveats" defaultValue={brief.caveats} maxLength={1000} rows={5} />
         </div>
         <div className="form-actions">
           <button type="submit">Save human edits</button>
@@ -782,10 +1374,12 @@ function ActivityPanel({ workspace }: { workspace: ResearchWorkspaceState }) {
       <div className="section-heading">
         <div>
           <p className="section-kicker">Collaboration trail</p>
-          <h2 id="activity-heading">Activity ({workspace.activity.length})</h2>
+          <h2 id="activity-heading">Collaboration log</h2>
         </div>
-        <span className="provider-chip">Newest last · max 20</span>
       </div>
+      <p className="section-intro">
+        See the human decisions and agent actions that shaped the workspace.
+      </p>
       {workspace.activity.length === 0 ? (
         <p className="empty-state">No workspace activity yet.</p>
       ) : (

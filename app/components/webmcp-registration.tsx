@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { createWebMcpTools } from "@/src/client/webmcp-tools";
+import { instrumentWebMcpTools } from "@/src/client/webmcp-activity";
 
 type ModelContext = NonNullable<Document["modelContext"]>;
 
@@ -60,7 +61,7 @@ function createRegistration(modelContext: ModelContext): RegistrationState {
   const controller = new AbortController();
 
   void Promise.all(
-    createWebMcpTools().map((tool) =>
+    instrumentWebMcpTools(createWebMcpTools()).map((tool) =>
       modelContext.registerTool(tool, { signal: controller.signal }),
     ),
   )
