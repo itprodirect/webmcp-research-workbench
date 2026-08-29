@@ -160,6 +160,7 @@ evidence where later V0 decisions supersede their earlier expectations.
 19. [Dogfood Ledger V0](docs/18-dogfood-ledger-v0.md)
 20. [Dogfood After-Action Report V0](docs/19-dogfood-after-action-report-v0.md)
 21. [V0 Product Freeze](docs/20-v0-product-freeze.md)
+22. [Phase 3 historical after-action report](docs/21-phase-3-aar-historical.md)
 
 ## License
 
