@@ -41,7 +41,7 @@ const draft = {
 test("derives all seven Research Cycle presentation states from existing workspace state", () => {
   const cases = [
     [workspace(), "define", 0, "human", "Define the research mission"],
-    [workspace({ mission }), "research", 1, "agent", "Research the mission and propose evidence"],
+    [workspace({ mission }), "research", 1, "agent", "Research the mission"],
     [workspace({ mission, proposals: pendingProposals }), "curate", 2, "human", "Review the agent's proposed evidence"],
     [workspace({ mission, accepted_evidence: acceptedEvidence }), "synthesize", 3, "agent", "Draft the Evidence Brief"],
     [workspace({ mission, accepted_evidence: acceptedEvidence, brief: draft }), "review", 4, "human", "Review and edit the agent draft"],
@@ -55,6 +55,7 @@ test("derives all seven Research Cycle presentation states from existing workspa
     assert.equal(presentation.activeStageIndex, activeStageIndex);
     assert.equal(presentation.owner, owner);
     assert.equal(presentation.headline, headline);
+    assert.match(presentation.nextStep, /^Next:/);
   }
 });
 

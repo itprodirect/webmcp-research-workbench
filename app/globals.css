@@ -355,6 +355,197 @@ h4 {
   margin-top: 0.65rem;
 }
 
+.cycle-agent-task-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.28rem 1.25rem;
+  margin: 0.55rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.cycle-next-action .cycle-next-cue {
+  margin-top: 0.7rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid rgba(39, 62, 53, 0.15);
+  color: var(--ink);
+  font-weight: 750;
+}
+
+.webmcp-activity {
+  margin-top: 0.75rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  background: var(--surface-soft);
+}
+
+.webmcp-activity-prominent {
+  border-color: rgba(49, 79, 168, 0.45);
+  background: linear-gradient(135deg, var(--agent-soft), rgba(255, 255, 255, 0.94));
+  box-shadow: inset 0 0 0 1px rgba(49, 79, 168, 0.08);
+}
+
+.webmcp-activity-compact {
+  padding-block: 0.55rem;
+  color: var(--muted);
+}
+
+.webmcp-activity-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.webmcp-activity-heading h3,
+.webmcp-activity-heading p,
+.webmcp-activity-note {
+  margin: 0;
+}
+
+.webmcp-activity-heading h3 {
+  font-size: 0.94rem;
+}
+
+.webmcp-activity-summary {
+  flex: 0 0 auto;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(90, 104, 98, 0.1);
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.webmcp-activity-prominent .webmcp-activity-summary {
+  background: rgba(49, 79, 168, 0.1);
+  color: var(--agent);
+}
+
+.webmcp-activity-note {
+  margin-top: 0.25rem;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.webmcp-activity-compact .webmcp-activity-note {
+  font-size: 0.72rem;
+}
+
+.webmcp-activity-list {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.webmcp-activity-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: start;
+  gap: 0.25rem 0.4rem;
+  min-width: 0;
+  padding: 0.5rem;
+  border: 1px solid rgba(90, 104, 98, 0.2);
+  border-radius: 0.42rem;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.webmcp-activity-marker {
+  grid-row: 1 / span 2;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.webmcp-activity-copy {
+  display: grid;
+  min-width: 0;
+  gap: 0.1rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.webmcp-activity-copy strong {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  gap: 0.25rem;
+  color: var(--ink);
+}
+
+.webmcp-activity-copy code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.66rem;
+}
+
+.webmcp-invocation-count {
+  color: var(--agent);
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+.webmcp-activity-status {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.webmcp-activity-running {
+  border-color: rgba(49, 79, 168, 0.55);
+  background: var(--agent-soft);
+}
+
+.webmcp-activity-running .webmcp-activity-marker,
+.webmcp-activity-running .webmcp-activity-status {
+  color: var(--agent);
+}
+
+.webmcp-activity-running .webmcp-activity-marker {
+  animation: webmcp-activity-pulse 1.15s ease-in-out infinite;
+}
+
+.webmcp-activity-succeeded {
+  border-color: rgba(38, 106, 77, 0.42);
+  background: var(--accent-soft);
+}
+
+.webmcp-activity-succeeded .webmcp-activity-marker,
+.webmcp-activity-succeeded .webmcp-activity-status {
+  color: var(--approved);
+}
+
+.webmcp-activity-failed {
+  border-color: rgba(167, 46, 46, 0.55);
+  background: #fff1f1;
+}
+
+.webmcp-activity-failed .webmcp-activity-marker,
+.webmcp-activity-failed .webmcp-activity-status {
+  color: #a72e2e;
+}
+
+@keyframes webmcp-activity-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .approved-artifact-actions {
   margin-top: 0.7rem;
   padding-top: 0.7rem;
@@ -1186,6 +1377,11 @@ summary {
     padding: 0.5rem 0.4rem;
   }
 
+  .cycle-agent-task-list,
+  .webmcp-activity-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .cycle-stage-label {
     font-size: 0.75rem;
   }
@@ -1297,5 +1493,26 @@ summary {
 
   .cycle-stage-status {
     grid-column: 2 / span 2;
+  }
+
+  .cycle-agent-task-list,
+  .webmcp-activity-list {
+    grid-template-columns: 1fr;
+  }
+
+  .webmcp-activity-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .webmcp-activity-summary {
+    align-self: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .webmcp-activity-running .webmcp-activity-marker {
+    animation: none;
   }
 }

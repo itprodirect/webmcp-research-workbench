@@ -26,6 +26,10 @@ import {
   getResearchCycleStageStatus,
   RESEARCH_CYCLE_STAGES,
 } from "@/src/client/research-cycle";
+import {
+  webMcpActivityStore,
+  type WebMcpActivityEntry,
+} from "@/src/client/webmcp-activity";
 
 const UI_RESULT_LIMIT = 5;
 const AGENT_RESEARCH_PROMPT =
@@ -373,7 +377,16 @@ function RolesPanel() {
 
 function ResearchCycle({ workspace }: { workspace: ResearchWorkspaceState }) {
   const presentation = deriveResearchCyclePresentation(workspace);
-  const [copyFeedback, setCopyFeedback] = useState<{
+  const webMcpActivity = useSyncExternalStore(
+    webMcpActivityStore.subscribe,
+    webMcpActivityStore.getSnapshot,
+    webMcpActivityStore.getServerSnapshot,
+  );
+  const [researchCopyFeedback, setResearchCopyFeedback] = useState<{
+    kind: "success" | "error";
+    text: string;
+  } | null>(null);
+  const [synthesisCopyFeedback, setSynthesisCopyFeedback] = useState<{
     kind: "success" | "error";
     text: string;
   } | null>(null);
@@ -384,9 +397,27 @@ function ResearchCycle({ workspace }: { workspace: ResearchWorkspaceState }) {
         throw new Error("Clipboard API unavailable.");
       }
       await navigator.clipboard.writeText(AGENT_RESEARCH_PROMPT);
-      setCopyFeedback({ kind: "success", text: "Research prompt copied." });
+      setResearchCopyFeedback({ kind: "success", text: "Research prompt copied." });
     } catch {
-      setCopyFeedback({ kind: "error", text: "Could not copy the research prompt." });
+      setResearchCopyFeedback({
+        kind: "error",
+        text: "Could not copy the research prompt.",
+      });
+    }
+  }
+
+  async function handleCopySynthesisPrompt() {
+    try {
+      if (!navigator.clipboard) {
+        throw new Error("Clipboard API unavailable.");
+      }
+      await navigator.clipboard.writeText(AGENT_SYNTHESIS_PROMPT);
+      setSynthesisCopyFeedback({ kind: "success", text: "Synthesis prompt copied." });
+    } catch {
+      setSynthesisCopyFeedback({
+        kind: "error",
+        text: "Could not copy the synthesis prompt.",
+      });
     }
   }
 
@@ -438,17 +469,41 @@ function ResearchCycle({ workspace }: { workspace: ResearchWorkspaceState }) {
         <h3>{presentation.headline}</h3>
         <p>{presentation.guidance}</p>
         {presentation.state === "research" && (
+          <ul className="cycle-agent-task-list">
+            <li>Read the shared workspace.</li>
+            <li>Use Keyword and Semantic OpenAlex search where useful.</li>
+            <li>Inspect candidate sources and compare their evidence context.</li>
+            <li>Propose a bounded evidence set, then stop for human review.</li>
+          </ul>
+        )}
+        {presentation.state === "research" && (
           <div className="cycle-copy-action">
             <button type="button" onClick={handleCopyResearchPrompt}>
               Copy research prompt
             </button>
-            {copyFeedback && (
+            {researchCopyFeedback && (
               <p
-                className={`copy-feedback ${copyFeedback.kind}`}
-                role={copyFeedback.kind === "error" ? "alert" : "status"}
+                className={`copy-feedback ${researchCopyFeedback.kind}`}
+                role={researchCopyFeedback.kind === "error" ? "alert" : "status"}
                 aria-live="polite"
               >
-                {copyFeedback.text}
+                {researchCopyFeedback.text}
+              </p>
+            )}
+          </div>
+        )}
+        {presentation.state === "synthesize" && (
+          <div className="cycle-copy-action">
+            <button type="button" onClick={handleCopySynthesisPrompt}>
+              Copy synthesis prompt
+            </button>
+            {synthesisCopyFeedback && (
+              <p
+                className={`copy-feedback ${synthesisCopyFeedback.kind}`}
+                role={synthesisCopyFeedback.kind === "error" ? "alert" : "status"}
+                aria-live="polite"
+              >
+                {synthesisCopyFeedback.text}
               </p>
             )}
           </div>
@@ -456,9 +511,110 @@ function ResearchCycle({ workspace }: { workspace: ResearchWorkspaceState }) {
         {presentation.state === "complete" && (
           <ApprovedBriefActions workspace={workspace} />
         )}
+        <p className="cycle-next-cue">{presentation.nextStep}</p>
       </div>
+
+      <LiveWebMcpActivity
+        activity={webMcpActivity}
+        prominent={presentation.owner === "agent"}
+      />
     </section>
   );
+}
+
+function LiveWebMcpActivity({
+  activity,
+  prominent,
+}: {
+  activity: readonly WebMcpActivityEntry[];
+  prominent: boolean;
+}) {
+  const completedCount = activity.filter(
+    (entry) => entry.status === "succeeded",
+  ).length;
+  const invocationCount = activity.reduce(
+    (total, entry) => total + entry.invocationCount,
+    0,
+  );
+
+  return (
+    <section
+      className={`webmcp-activity ${prominent ? "webmcp-activity-prominent" : "webmcp-activity-compact"}`}
+      aria-labelledby="webmcp-activity-heading"
+      aria-live="polite"
+    >
+      <div className="webmcp-activity-heading">
+        <div>
+          <p className="section-kicker">Structured agent operations</p>
+          <h3 id="webmcp-activity-heading">Live WebMCP Activity</h3>
+        </div>
+        <span className="webmcp-activity-summary">
+          {invocationCount === 0
+            ? "Waiting"
+            : `${completedCount}/5 succeeded · ${invocationCount} call${invocationCount === 1 ? "" : "s"}`}
+        </span>
+      </div>
+      <p className="webmcp-activity-note">
+        {prominent
+          ? "Watch the five registered WebMCP tools as the agent performs this stage. This shows tool execution, not private reasoning."
+          : "Agent tool activity is paused while control is with you. This browser-local summary resets on reload."}
+      </p>
+      {prominent && (
+        <ol className="webmcp-activity-list">
+          {activity.map((entry) => (
+            <li
+              className={`webmcp-activity-item webmcp-activity-${entry.status}`}
+              key={entry.name}
+            >
+              <span className="webmcp-activity-marker" aria-hidden="true">
+                {activityMarker(entry.status)}
+              </span>
+              <span className="webmcp-activity-copy">
+                <strong>
+                  <code>{entry.name}</code>
+                  {entry.invocationCount > 1 && (
+                    <span className="webmcp-invocation-count">
+                      ×{entry.invocationCount}
+                    </span>
+                  )}
+                </strong>
+                <span>{entry.label}</span>
+              </span>
+              <span className="webmcp-activity-status">
+                {activityStatusLabel(entry.status)}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+function activityMarker(status: WebMcpActivityEntry["status"]) {
+  switch (status) {
+    case "running":
+      return "●";
+    case "succeeded":
+      return "✓";
+    case "failed":
+      return "!";
+    default:
+      return "○";
+  }
+}
+
+function activityStatusLabel(status: WebMcpActivityEntry["status"]) {
+  switch (status) {
+    case "running":
+      return "Running";
+    case "succeeded":
+      return "Succeeded";
+    case "failed":
+      return "Failed";
+    default:
+      return "Unused";
+  }
 }
 
 function ApprovedBriefActions({ workspace }: { workspace: ResearchWorkspaceState }) {

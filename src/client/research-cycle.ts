@@ -27,6 +27,7 @@ export type ResearchCyclePresentation = {
   turnLabel: string;
   headline: string;
   guidance: string;
+  nextStep: string;
 };
 
 export function deriveResearchCyclePresentation(
@@ -41,6 +42,8 @@ export function deriveResearchCyclePresentation(
       headline: "Define the research mission",
       guidance:
         "Set the question, audience, and evidence limit below. The agent cannot begin until the human-owned mission exists.",
+      nextStep:
+        "Next: Save the mission. The Research Cycle will move to Agent's Turn — Research.",
     };
   }
 
@@ -54,6 +57,8 @@ export function deriveResearchCyclePresentation(
         "Research cycle complete — your human-approved research artifact is ready to use in the next stage of your work.",
       guidance:
         "Download or copy the approved brief below. The Collaboration log and Reset workspace remain available as secondary actions.",
+      nextStep:
+        "Next: Use the human-approved artifact in the next stage of your work. No further agent action is required for this mission.",
     };
   }
 
@@ -66,6 +71,8 @@ export function deriveResearchCyclePresentation(
       headline: "Review the agent's proposed evidence",
       guidance:
         "Accept strong sources and reject weaker ones. Only human-accepted evidence can support the Evidence Brief.",
+      nextStep:
+        "Next: When the proposal queue is clear and evidence is accepted, the Research Cycle will move to Agent's Turn — Synthesize.",
     };
   }
 
@@ -78,6 +85,8 @@ export function deriveResearchCyclePresentation(
       headline: "Approve the reviewed brief",
       guidance:
         "The brief has been reviewed. Approve it when the evidence, findings, and caveats reflect your final judgment.",
+      nextStep:
+        "Next: Approval completes the Research Cycle and makes the human-approved Markdown artifact available.",
     };
   }
 
@@ -90,6 +99,8 @@ export function deriveResearchCyclePresentation(
       headline: "Review and edit the agent draft",
       guidance:
         "Check every finding and citation, save any human edits, then mark the brief reviewed. Approval remains unavailable until review is complete.",
+      nextStep:
+        "Next: Mark the draft reviewed. The Research Cycle will remain Your Turn and move to final approval.",
     };
   }
 
@@ -101,7 +112,9 @@ export function deriveResearchCyclePresentation(
       turnLabel: "AGENT'S TURN",
       headline: "Draft the Evidence Brief",
       guidance:
-        "Ask the WebMCP-enabled agent to draft from the accepted evidence. The result must return unreviewed and unapproved.",
+        "Give the synthesis instruction below to the WebMCP-enabled agent. It will draft only from human-accepted evidence and return the result unreviewed and unapproved.",
+      nextStep:
+        "Next: Return here when the agent draft appears. The Research Cycle will move to Your Turn — Approve, beginning with human review.",
     };
   }
 
@@ -110,9 +123,11 @@ export function deriveResearchCyclePresentation(
     activeStageIndex: 1,
     owner: "agent",
     turnLabel: "AGENT'S TURN",
-    headline: "Research the mission and propose evidence",
+    headline: "Research the mission",
     guidance:
-      "Ask a WebMCP-enabled agent to read the mission, search and inspect OpenAlex sources, propose up to three candidates, then stop for human review.",
+      "Your mission is ready. Give the instruction below to the WebMCP-enabled agent you're working with.",
+    nextStep:
+      "Next: Return here when the agent has proposed evidence. The Research Cycle will move to Your Turn — Curate.",
   };
 }
 

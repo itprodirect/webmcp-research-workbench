@@ -6,6 +6,8 @@ const page = readFileSync("app/page.tsx", "utf8");
 const workbench = readFileSync("app/components/search-workbench.tsx", "utf8");
 const researchCycle = readFileSync("src/client/research-cycle.ts", "utf8");
 const styles = readFileSync("app/globals.css", "utf8");
+const registration = readFileSync("app/components/webmcp-registration.tsx", "utf8");
+const activity = readFileSync("src/client/webmcp-activity.ts", "utf8");
 
 test("judge-facing framing teaches the five-step human-agent workflow", () => {
   assert.match(page, /The agent gathers\. You decide what counts\./);
@@ -25,6 +27,41 @@ test("mission-to-agent handoff copies a clipboard-only research prompt", () => {
   assert.match(workbench, /Copy research prompt/);
   assert.match(workbench, /Research prompt copied\./);
   assert.match(workbench, /Could not copy the research prompt\./);
+});
+
+test("Research Cycle exposes live five-tool execution telemetry without persistence", () => {
+  assert.match(registration, /instrumentWebMcpTools\(createWebMcpTools\(\)\)/);
+  assert.match(workbench, /Live WebMCP Activity/);
+  assert.match(workbench, /webMcpActivityStore\.subscribe/);
+  assert.match(workbench, /presentation\.owner === "agent"/);
+  for (const name of [
+    "get_research_workspace",
+    "search_sources",
+    "get_source_details",
+    "propose_evidence",
+    "draft_evidence_brief",
+  ]) {
+    assert.ok(activity.includes(`name: "${name}"`));
+  }
+  for (const status of ["unused", "running", "succeeded", "failed"]) {
+    assert.ok(activity.includes(`"${status}"`));
+  }
+  assert.doesNotMatch(activity, /localStorage|sessionStorage|fetch\(|workspaceStore/);
+  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.match(styles, /\.webmcp-activity-running/);
+  assert.match(styles, /\.webmcp-activity-succeeded/);
+  assert.match(styles, /\.webmcp-activity-failed/);
+});
+
+test("every Research Cycle action includes an explicit next-step cue", () => {
+  assert.match(workbench, /className="cycle-next-cue"/);
+  assert.match(researchCycle, /Your mission is ready\. Give the instruction below/);
+  assert.match(researchCycle, /Your Turn — Curate/);
+  assert.match(researchCycle, /Agent's Turn — Synthesize/);
+  assert.match(researchCycle, /Your Turn — Approve/);
+  assert.match(researchCycle, /human-approved Markdown artifact/);
+  assert.match(workbench, /Copy synthesis prompt/);
+  assert.match(workbench, /Copy agent prompt/);
 });
 
 test("manual discovery is explicitly optional, agent-first, and collapsible", () => {
