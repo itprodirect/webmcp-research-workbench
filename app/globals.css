@@ -352,7 +352,8 @@ h4 {
   color: var(--approved);
 }
 
-.cycle-copy-action {
+.cycle-copy-action,
+.handoff-copy-action {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -1391,6 +1392,57 @@ summary {
   border-top: 4px solid var(--agent);
 }
 
+.brief-completion {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid rgba(38, 106, 77, 0.28);
+  border-left: 4px solid var(--approved);
+  border-radius: 0.55rem;
+  background: var(--accent-soft);
+}
+
+.brief-completion h3,
+.brief-completion p {
+  margin-top: 0;
+}
+
+.brief-completion-cue {
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.brief-save-actions span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.brief-workflow-action {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(97, 79, 180, 0.25);
+  border-left: 4px solid var(--human);
+  border-radius: 0.55rem;
+  background: var(--human-soft);
+}
+
+.brief-workflow-action h3,
+.brief-workflow-action p {
+  margin-top: 0;
+}
+
+.brief-workflow-action p:not(.section-kicker) {
+  max-width: 760px;
+  color: var(--muted);
+}
+
+.brief-workflow-feedback {
+  margin: 0.75rem 0 0;
+  color: var(--error);
+  font-weight: 800;
+}
+
 .handoff-panel {
   border-top: 4px solid var(--agent);
   background: linear-gradient(135deg, var(--surface) 0%, var(--agent-soft) 180%);
@@ -1425,27 +1477,6 @@ summary {
 
 .human-handoff p {
   margin: 0;
-}
-
-.human-handoff ol {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  margin: 0.7rem 0 0;
-  padding: 0;
-  list-style: none;
-  font-weight: 800;
-}
-
-.human-handoff li {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-}
-
-.human-handoff li:not(:last-child)::after {
-  color: var(--human);
-  content: "→";
 }
 
 .human-edit-note {

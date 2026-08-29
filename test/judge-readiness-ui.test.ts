@@ -16,6 +16,10 @@ const hudComponent = workbench.slice(
   workbench.indexOf("function WorkbenchHud"),
   workbench.indexOf("function WebMcpActivityList"),
 );
+const briefComponent = workbench.slice(
+  workbench.indexOf("function BriefPanel"),
+  workbench.indexOf("function ActivityPanel"),
+);
 
 test("judge-facing framing teaches the five-step human-agent workflow", () => {
   assert.match(page, /The agent gathers\. You decide what counts\./);
@@ -30,12 +34,14 @@ test("judge-facing framing teaches the five-step human-agent workflow", () => {
   assert.match(workbench, /aria-current=\{stageStatus === "current" \? "step" : undefined\}/);
 });
 
-test("mission-to-agent handoff copies a clipboard-only research prompt", () => {
+test("Research is conversational-first with an optional clipboard example", () => {
+  assert.match(researchCycle, /Tell your agent to research this mission using the Workbench/);
   assert.match(workbench, /prompt=\{AGENT_RESEARCH_PROMPT\}/);
   assert.match(workbench, /navigator\.clipboard\.writeText\(prompt\)/);
-  assert.match(workbench, /Copy research prompt/);
-  assert.match(workbench, /Research prompt copied\./);
+  assert.match(workbench, /Copy example instruction/);
+  assert.match(workbench, /Example research instruction copied\./);
   assert.match(workbench, /Could not copy the research prompt\./);
+  assert.match(workbench, /role=\{feedback\.kind === "error" \? "alert" : "status"\}/);
 });
 
 test("the global Workbench HUD exposes live five-tool telemetry without persistence", () => {
@@ -67,13 +73,12 @@ test("the global Workbench HUD exposes live five-tool telemetry without persiste
 
 test("every Research Cycle action includes an explicit next-step cue", () => {
   assert.match(workbench, /className="cycle-next-cue"/);
-  assert.match(researchCycle, /Your mission is ready\. Give the instruction below/);
+  assert.match(researchCycle, /Tell your agent to research this mission/);
   assert.match(researchCycle, /Your Turn — Curate/);
   assert.match(researchCycle, /Agent's Turn — Synthesize/);
   assert.match(researchCycle, /Your Turn — Approve/);
   assert.match(researchCycle, /human-approved Markdown artifact/);
-  assert.match(workbench, /Copy synthesis prompt/);
-  assert.match(workbench, /Copy agent prompt/);
+  assert.match(workbench, /Copy example instruction/);
 });
 
 test("the full cycle hands off to an action-linked bottom-right Workbench HUD", () => {
@@ -144,22 +149,52 @@ test("manual discovery is explicitly optional, agent-first, and collapsible", ()
   assert.match(styles, /\.manual-verification-content \.search-form/);
 });
 
-test("accepted evidence handoff copies the authorized prompt with accessible feedback", () => {
+test("Synthesize is conversational-first with the authorized optional example", () => {
   const prompt =
     "In the WebMCP Research Workbench, read the current research workspace and draft the Evidence Brief for the active mission. Use only the human-accepted evidence already in the workspace when supporting or citing findings. Cite each finding to the accepted source IDs that support it, include relevant caveats about the limits of the evidence, and leave the result for human review. Do not mark it reviewed or approve it.";
 
   assert.ok(workbench.includes(prompt));
-  assert.match(workbench, /navigator\.clipboard\.writeText\(AGENT_SYNTHESIS_PROMPT\)/);
-  assert.match(workbench, /Copy agent prompt/);
-  assert.match(workbench, /Prompt copied\./);
-  assert.match(workbench, /Could not copy the prompt\./);
-  assert.match(workbench, /role=\{copyFeedback\.kind === "error" \? "alert" : "status"\}/);
+  assert.match(researchCycle, /Tell your agent to draft the brief using only the evidence you accepted/);
+  assert.match(briefComponent, /Tell your agent to draft the brief using only the evidence you accepted/);
+  assert.match(briefComponent, /prompt=\{AGENT_SYNTHESIS_PROMPT\}/);
+  assert.match(briefComponent, /label="Copy example instruction"/);
+  assert.match(briefComponent, /Example synthesis instruction copied\./);
+  assert.match(briefComponent, /Could not copy the synthesis instruction\./);
 });
 
 test("brief status reflects draft, human-reviewed, and approved states", () => {
   assert.match(
     workbench,
     /const status = brief\.approved\s+\? "Human approved"\s+: brief\.human_reviewed\s+\? "Human reviewed — approval pending"\s+: "Agent draft — human review required";/,
+  );
+});
+
+test("brief review and approval are progressive actions with unsaved-edit guards", () => {
+  assert.match(briefComponent, /Save human edits/);
+  assert.match(briefComponent, /Review the saved draft/);
+  assert.match(briefComponent, />Mark reviewed<\/button>/);
+  assert.match(briefComponent, /brief\.human_reviewed && !brief\.approved/);
+  assert.match(briefComponent, />Approve brief<\/button>/);
+  assert.match(briefComponent, /hasUnsavedFormChanges\(form\)/);
+  assert.match(briefComponent, /Save your edits before completing review\./);
+  assert.match(briefComponent, /Save your edits before approving the brief\./);
+  assert.doesNotMatch(briefComponent, />Reviewed<\/button>|>Approved<\/button>/);
+  assert.doesNotMatch(briefComponent, /disabled=\{!brief\.human_reviewed/);
+});
+
+test("approval reveals one immediate local completion handoff without navigation", () => {
+  assert.match(briefComponent, /Research complete/);
+  assert.match(briefComponent, /Your human-approved research artifact is ready\./);
+  assert.match(briefComponent, /<ApprovedBriefActions workspace=\{workspace\} \/>/);
+  assert.match(briefComponent, /Use the approved artifact in the next stage of your work/);
+  assert.doesNotMatch(briefComponent, /scrollIntoView|window\.scroll|location\./);
+  assert.ok(
+    briefComponent.indexOf("{editor}") <
+      briefComponent.indexOf('className="brief-completion"'),
+  );
+  assert.equal(
+    workbench.match(/<ApprovedBriefActions workspace=\{workspace\} \/>/g)?.length,
+    1,
   );
 });
 

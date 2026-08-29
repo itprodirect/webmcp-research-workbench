@@ -7,7 +7,6 @@ import type {
   SourceRecord,
 } from "@/src/domain/source-record";
 import type {
-  EvidenceBrief,
   ResearchMission,
   ResearchWorkspaceState,
   WorkspaceEvidence,
@@ -335,8 +334,7 @@ export function SearchWorkbench() {
       />
 
       <BriefPanel
-        brief={workspace.brief}
-        acceptedEvidence={workspace.accepted_evidence}
+        workspace={workspace}
         onEdit={(input) =>
           performWorkspaceAction(
             () => workspaceStore.editBrief(input),
@@ -477,21 +475,18 @@ function ResearchCycle({
         {presentation.state === "research" && (
           <PromptCopyAction
             errorMessage="Could not copy the research prompt."
-            label="Copy research prompt"
+            label="Copy example instruction"
             prompt={AGENT_RESEARCH_PROMPT}
-            successMessage="Research prompt copied."
+            successMessage="Example research instruction copied."
           />
         )}
         {presentation.state === "synthesize" && (
           <PromptCopyAction
             errorMessage="Could not copy the synthesis prompt."
-            label="Copy synthesis prompt"
+            label="Copy example instruction"
             prompt={AGENT_SYNTHESIS_PROMPT}
-            successMessage="Synthesis prompt copied."
+            successMessage="Example synthesis instruction copied."
           />
-        )}
-        {presentation.state === "complete" && (
-          <ApprovedBriefActions workspace={workspace} />
         )}
         <p className="cycle-next-cue">{presentation.nextStep}</p>
       </div>
@@ -650,18 +645,18 @@ function WorkbenchHud({
             <PromptCopyAction
               className="hud-panel-actions"
               errorMessage="Could not copy the research prompt."
-              label="Copy research prompt"
+              label="Copy example instruction"
               prompt={AGENT_RESEARCH_PROMPT}
-              successMessage="Research prompt copied."
+              successMessage="Example research instruction copied."
             />
           )}
           {presentation.state === "synthesize" && (
             <PromptCopyAction
               className="hud-panel-actions"
               errorMessage="Could not copy the synthesis prompt."
-              label="Copy synthesis prompt"
+              label="Copy example instruction"
               prompt={AGENT_SYNTHESIS_PROMPT}
-              successMessage="Synthesis prompt copied."
+              successMessage="Example synthesis instruction copied."
             />
           )}
           {presentation.state !== "research" &&
@@ -1291,34 +1286,20 @@ function AcceptedEvidencePanel({
 }
 
 function BriefPanel({
-  brief,
-  acceptedEvidence,
+  workspace,
   onEdit,
   onReview,
   onApprove,
 }: {
-  brief: EvidenceBrief | null;
-  acceptedEvidence: WorkspaceEvidence[];
+  workspace: ResearchWorkspaceState;
   onEdit: (input: unknown) => void;
   onReview: () => void;
   onApprove: () => void;
 }) {
-  const [copyFeedback, setCopyFeedback] = useState<{
-    kind: "success" | "error";
-    text: string;
-  } | null>(null);
-
-  async function handleCopyPrompt() {
-    try {
-      if (!navigator.clipboard) {
-        throw new Error("Clipboard API unavailable.");
-      }
-      await navigator.clipboard.writeText(AGENT_SYNTHESIS_PROMPT);
-      setCopyFeedback({ kind: "success", text: "Prompt copied." });
-    } catch {
-      setCopyFeedback({ kind: "error", text: "Could not copy the prompt." });
-    }
-  }
+  const brief = workspace.brief;
+  const acceptedEvidence = workspace.accepted_evidence;
+  const briefFormRef = useRef<HTMLFormElement | null>(null);
+  const [workflowError, setWorkflowError] = useState("");
 
   if (!brief) {
     const isReadyForSynthesis = acceptedEvidence.length > 0;
@@ -1339,22 +1320,16 @@ function BriefPanel({
             <h3>Ready for agent synthesis</h3>
             <p><strong>Your evidence set is ready. The next move is the agent&apos;s.</strong></p>
             <p>
-              Ask your WebMCP-enabled agent to draft the Evidence Brief. The brief can
-              cite only the evidence you&apos;ve accepted, and it returns as a draft for
-              your review.
+              Tell your agent to draft the brief using only the evidence you accepted.
+              It will return as a draft for your review.
             </p>
-            <button type="button" onClick={handleCopyPrompt}>
-              Copy agent prompt
-            </button>
-            {copyFeedback && (
-              <p
-                className={`copy-feedback ${copyFeedback.kind}`}
-                role={copyFeedback.kind === "error" ? "alert" : "status"}
-                aria-live="polite"
-              >
-                {copyFeedback.text}
-              </p>
-            )}
+            <PromptCopyAction
+              className="handoff-copy-action"
+              errorMessage="Could not copy the synthesis instruction."
+              label="Copy example instruction"
+              prompt={AGENT_SYNTHESIS_PROMPT}
+              successMessage="Example synthesis instruction copied."
+            />
           </div>
         ) : (
           <p className="empty-state">
@@ -1366,21 +1341,64 @@ function BriefPanel({
     );
   }
 
+  const savedBrief = brief;
+
+  function readBriefForm(form: HTMLFormElement) {
+    const formData = new FormData(form);
+    return {
+      title: String(formData.get("brief-title") ?? ""),
+      summary: String(formData.get("brief-summary") ?? ""),
+      findings: savedBrief.findings.map((_, index) => ({
+        statement: String(formData.get(`finding-${index}-statement`) ?? ""),
+        source_ids: formData.getAll(`finding-${index}-sources`).map(String),
+      })),
+      caveats: String(formData.get("brief-caveats") ?? ""),
+    };
+  }
+
+  function hasUnsavedFormChanges(form: HTMLFormElement) {
+    const formBrief = readBriefForm(form);
+    return (
+      formBrief.title !== savedBrief.title ||
+      formBrief.summary !== savedBrief.summary ||
+      formBrief.caveats !== savedBrief.caveats ||
+      formBrief.findings.some((finding, index) => {
+        const savedFinding = savedBrief.findings[index];
+        return (
+          finding.statement !== savedFinding.statement ||
+          finding.source_ids.length !== savedFinding.source_ids.length ||
+          finding.source_ids.some(
+            (sourceId) => !savedFinding.source_ids.includes(sourceId),
+          )
+        );
+      })
+    );
+  }
+
   function handleEdit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!brief) {
+    setWorkflowError("");
+    onEdit(readBriefForm(event.currentTarget));
+  }
+
+  function handleReview() {
+    const form = briefFormRef.current;
+    if (form && hasUnsavedFormChanges(form)) {
+      setWorkflowError("Save your edits before completing review.");
       return;
     }
-    const form = new FormData(event.currentTarget);
-    onEdit({
-      title: String(form.get("brief-title") ?? ""),
-      summary: String(form.get("brief-summary") ?? ""),
-      findings: brief.findings.map((_, index) => ({
-        statement: String(form.get(`finding-${index}-statement`) ?? ""),
-        source_ids: form.getAll(`finding-${index}-sources`).map(String),
-      })),
-      caveats: String(form.get("brief-caveats") ?? ""),
-    });
+    setWorkflowError("");
+    onReview();
+  }
+
+  function handleApprove() {
+    const form = briefFormRef.current;
+    if (form && hasUnsavedFormChanges(form)) {
+      setWorkflowError("Save your edits before approving the brief.");
+      return;
+    }
+    setWorkflowError("");
+    onApprove();
   }
 
   const status = brief.approved
@@ -1388,6 +1406,72 @@ function BriefPanel({
     : brief.human_reviewed
       ? "Human reviewed — approval pending"
       : "Agent draft — human review required";
+
+  const editor = (
+    <form
+      className="brief-form"
+      key={brief.updated_at}
+      ref={briefFormRef}
+      onSubmit={handleEdit}
+    >
+      <div className="field full-field">
+        <label htmlFor="brief-title">Title</label>
+        <input id="brief-title" name="brief-title" defaultValue={brief.title} maxLength={200} required />
+      </div>
+      <div className="field full-field">
+        <label htmlFor="brief-summary">Summary</label>
+        <textarea className="brief-summary" id="brief-summary" name="brief-summary" defaultValue={brief.summary} maxLength={1500} rows={6} required />
+      </div>
+      <div className="findings-editor">
+        <h3>Findings</h3>
+        {brief.findings.map((finding, index) => (
+          <fieldset className="finding-fieldset" key={`${brief.updated_at}-${index}`}>
+            <legend>Finding {index + 1}</legend>
+            <div className="field full-field">
+              <label htmlFor={`finding-${index}-statement`}>Statement</label>
+              <textarea
+                className="finding-statement"
+                id={`finding-${index}-statement`}
+                name={`finding-${index}-statement`}
+                defaultValue={finding.statement}
+                maxLength={1000}
+                rows={3}
+                required
+              />
+            </div>
+            <div className="citation-options">
+              <span className="field-label">Accepted evidence citations</span>
+              {acceptedEvidence.map((source) => (
+                <label className="citation-option" key={source.id}>
+                  <input
+                    type="checkbox"
+                    name={`finding-${index}-sources`}
+                    value={source.id}
+                    defaultChecked={finding.source_ids.includes(source.id)}
+                  />
+                  <span className="citation-copy">
+                    <code>{source.id}</code>
+                    <span aria-hidden="true"> — </span>
+                    <span>{source.title ?? "Title unknown"}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        ))}
+      </div>
+      <div className="field full-field">
+        <label htmlFor="brief-caveats">Caveats</label>
+        <textarea className="brief-caveats" id="brief-caveats" name="brief-caveats" defaultValue={brief.caveats} maxLength={1000} rows={5} />
+      </div>
+      <div className="form-actions brief-save-actions">
+        <button type="submit">Save human edits</button>
+        {(brief.human_reviewed || brief.approved) && (
+          <span>Saving new edits resets review and approval.</span>
+        )}
+      </div>
+    </form>
+  );
 
   return (
     <section className="workspace-panel brief-panel" aria-labelledby="brief-heading">
@@ -1402,83 +1486,61 @@ function BriefPanel({
         <div className="human-handoff">
           <p>
             <strong>
-              The agent wrote the first draft; you control the final result. Edit
-              anything that needs changing, mark the brief reviewed once you&apos;ve
-              checked it, then approve it. Until you approve it, it remains a draft.
+              The agent wrote the first draft; you control the final result. Complete
+              the single human action shown after the editor to advance.
             </strong>
           </p>
-          <ol aria-label="Human brief review sequence">
-            <li>Edit</li>
-            <li>Mark reviewed</li>
-            <li>Approve</li>
-          </ol>
         </div>
       )}
       <p className="trust-note">
         Based on provider metadata and abstracts, not verified full-text review.
       </p>
       {brief.human_edited && <p className="human-edit-note">Human edits are present.</p>}
-      <form className="brief-form" key={brief.updated_at} onSubmit={handleEdit}>
-        <div className="field full-field">
-          <label htmlFor="brief-title">Title</label>
-          <input id="brief-title" name="brief-title" defaultValue={brief.title} maxLength={200} required />
+      {editor}
+      {!brief.human_reviewed && !brief.approved && (
+        <div className="brief-workflow-action brief-review-action">
+          <p className="section-kicker">Next human action</p>
+          <h3>Review the saved draft</h3>
+          <p>
+            Review the brief. If you changed the content, save your edits first.
+            When you&apos;re satisfied with the saved content, mark it reviewed.
+          </p>
+          <button type="button" onClick={handleReview}>Mark reviewed</button>
         </div>
-        <div className="field full-field">
-          <label htmlFor="brief-summary">Summary</label>
-          <textarea className="brief-summary" id="brief-summary" name="brief-summary" defaultValue={brief.summary} maxLength={1500} rows={6} required />
+      )}
+      {brief.human_reviewed && !brief.approved && (
+        <div className="brief-workflow-action brief-approval-action">
+          <p className="section-kicker">Next human action</p>
+          <h3>Review complete</h3>
+          <p>
+            Approve the brief when you&apos;re satisfied this is the final
+            human-authorized artifact.
+          </p>
+          <button type="button" onClick={handleApprove}>Approve brief</button>
         </div>
-        <div className="findings-editor">
-          <h3>Findings</h3>
-          {brief.findings.map((finding, index) => (
-            <fieldset className="finding-fieldset" key={`${brief.updated_at}-${index}`}>
-              <legend>Finding {index + 1}</legend>
-              <div className="field full-field">
-                <label htmlFor={`finding-${index}-statement`}>Statement</label>
-                <textarea
-                  className="finding-statement"
-                  id={`finding-${index}-statement`}
-                  name={`finding-${index}-statement`}
-                  defaultValue={finding.statement}
-                  maxLength={1000}
-                  rows={3}
-                  required
-                />
-              </div>
-              <div className="citation-options">
-                <span className="field-label">Accepted evidence citations</span>
-                {acceptedEvidence.map((source) => (
-                  <label className="citation-option" key={source.id}>
-                    <input
-                      type="checkbox"
-                      name={`finding-${index}-sources`}
-                      value={source.id}
-                      defaultChecked={finding.source_ids.includes(source.id)}
-                    />
-                    <span className="citation-copy">
-                      <code>{source.id}</code>
-                      <span aria-hidden="true"> — </span>
-                      <span>{source.title ?? "Title unknown"}</span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-          ))}
+      )}
+      {brief.approved && (
+        <div className="brief-completion">
+          <div role="status" aria-live="polite">
+            <p className="section-kicker">Research complete</p>
+            <h3>Your human-approved research artifact is ready.</h3>
+          </div>
+          <ApprovedBriefActions workspace={workspace} />
+          <p className="brief-completion-cue">
+            Use the approved artifact in the next stage of your work, or continue
+            working with your agent.
+          </p>
         </div>
-        <div className="field full-field">
-          <label htmlFor="brief-caveats">Caveats</label>
-          <textarea className="brief-caveats" id="brief-caveats" name="brief-caveats" defaultValue={brief.caveats} maxLength={1000} rows={5} />
-        </div>
-        <div className="form-actions">
-          <button type="submit">Save human edits</button>
-          <button className="secondary-button" type="button" onClick={onReview}>
-            {brief.human_reviewed ? "Reviewed" : "Mark reviewed"}
-          </button>
-          <button type="button" onClick={onApprove} disabled={!brief.human_reviewed || brief.approved}>
-            {brief.approved ? "Approved" : "Approve brief"}
-          </button>
-        </div>
-      </form>
+      )}
+      {workflowError && (
+        <p
+          className="brief-workflow-feedback"
+          role="alert"
+          aria-live="polite"
+        >
+          {workflowError}
+        </p>
+      )}
     </section>
   );
 }

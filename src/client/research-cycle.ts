@@ -112,7 +112,7 @@ export function deriveResearchCyclePresentation(
       turnLabel: "AGENT'S TURN",
       headline: "Draft the Evidence Brief",
       guidance:
-        "Give the synthesis instruction below to the WebMCP-enabled agent. It will draft only from human-accepted evidence and return the result unreviewed and unapproved.",
+        "Tell your agent to draft the brief using only the evidence you accepted. It will return the result unreviewed and unapproved.",
       nextStep:
         "Next: Return here when the agent draft appears. The Research Cycle will move to Your Turn — Approve, beginning with human review.",
     };
@@ -125,7 +125,7 @@ export function deriveResearchCyclePresentation(
     turnLabel: "AGENT'S TURN",
     headline: "Research the mission",
     guidance:
-      "Your mission is ready. Give the instruction below to the WebMCP-enabled agent you're working with.",
+      "Tell your agent to research this mission using the Workbench and stop when evidence proposals are ready for your review.",
     nextStep:
       "Next: Return here when the agent has proposed evidence. The Research Cycle will move to Your Turn — Curate.",
   };
