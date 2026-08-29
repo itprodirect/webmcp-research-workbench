@@ -8,6 +8,14 @@ const researchCycle = readFileSync("src/client/research-cycle.ts", "utf8");
 const styles = readFileSync("app/globals.css", "utf8");
 const registration = readFileSync("app/components/webmcp-registration.tsx", "utf8");
 const activity = readFileSync("src/client/webmcp-activity.ts", "utf8");
+const researchCycleComponent = workbench.slice(
+  workbench.indexOf("function ResearchCycle"),
+  workbench.indexOf("function PromptCopyAction"),
+);
+const hudComponent = workbench.slice(
+  workbench.indexOf("function WorkbenchHud"),
+  workbench.indexOf("function WebMcpActivityList"),
+);
 
 test("judge-facing framing teaches the five-step human-agent workflow", () => {
   assert.match(page, /The agent gathers\. You decide what counts\./);
@@ -23,17 +31,18 @@ test("judge-facing framing teaches the five-step human-agent workflow", () => {
 });
 
 test("mission-to-agent handoff copies a clipboard-only research prompt", () => {
-  assert.match(workbench, /navigator\.clipboard\.writeText\(AGENT_RESEARCH_PROMPT\)/);
+  assert.match(workbench, /prompt=\{AGENT_RESEARCH_PROMPT\}/);
+  assert.match(workbench, /navigator\.clipboard\.writeText\(prompt\)/);
   assert.match(workbench, /Copy research prompt/);
   assert.match(workbench, /Research prompt copied\./);
   assert.match(workbench, /Could not copy the research prompt\./);
 });
 
-test("Research Cycle exposes live five-tool execution telemetry without persistence", () => {
+test("the global Workbench HUD exposes live five-tool telemetry without persistence", () => {
   assert.match(registration, /instrumentWebMcpTools\(createWebMcpTools\(\)\)/);
-  assert.match(workbench, /Live WebMCP Activity/);
-  assert.match(workbench, /webMcpActivityStore\.subscribe/);
-  assert.match(workbench, /presentation\.owner === "agent"/);
+  assert.match(hudComponent, /<h2 id="workbench-hud-webmcp-heading">WebMCP Activity<\/h2>/);
+  assert.match(hudComponent, /webMcpActivityStore\.subscribe/);
+  assert.doesNotMatch(researchCycleComponent, /webMcpActivityStore|WebMcpActivity/);
   for (const name of [
     "get_research_workspace",
     "search_sources",
@@ -47,6 +56,9 @@ test("Research Cycle exposes live five-tool execution telemetry without persiste
     assert.ok(activity.includes(`"${status}"`));
   }
   assert.doesNotMatch(activity, /localStorage|sessionStorage|fetch\(|workspaceStore/);
+  assert.match(hudComponent, /entry\.invocationCount > 0/);
+  assert.match(hudComponent, /used · \$\{invocationCount\} call/);
+  assert.match(hudComponent, /\$\{running\.name\} running/);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(styles, /\.webmcp-activity-running/);
   assert.match(styles, /\.webmcp-activity-succeeded/);
@@ -64,23 +76,61 @@ test("every Research Cycle action includes an explicit next-step cue", () => {
   assert.match(workbench, /Copy agent prompt/);
 });
 
-test("the full cycle hands off to a compact, action-linked viewport dock", () => {
+test("the full cycle hands off to an action-linked bottom-right Workbench HUD", () => {
+  assert.match(workbench, /id="research-cycle"/);
+  assert.match(workbench, /<h2 id="research-cycle-heading">Research Cycle<\/h2>/);
   assert.match(workbench, /new IntersectionObserver/);
-  assert.match(workbench, /Compact Research Cycle/);
-  assert.match(workbench, /Stage \{activeStageNumber\} \/ \{RESEARCH_CYCLE_STAGES\.length\}/);
-  assert.match(workbench, /Jump to current action/);
+  assert.match(workbench, /showResearchCycleControl/);
+  assert.match(workbench, /aria-label="Workbench HUD"/);
+  assert.match(hudComponent, /Your Turn/);
+  assert.match(hudComponent, /Agent's Turn/);
+  assert.match(hudComponent, /Complete · Approved/);
   assert.match(workbench, /getResearchCycleActionTargetId\(presentation\.state\)/);
   assert.match(workbench, /scrollIntoView/);
   assert.match(workbench, /prefers-reduced-motion: reduce/);
   assert.match(workbench, /id="approved-brief-actions"/);
-  assert.match(styles, /\.research-cycle-dock/);
+  assert.match(styles, /\.workbench-hud \{[\s\S]*position: fixed;[\s\S]*right: 1rem;[\s\S]*bottom: 1rem;/);
+  assert.doesNotMatch(workbench, /research-cycle-dock|Compact Research Cycle/);
+  assert.doesNotMatch(styles, /\.research-cycle-dock|\.cycle-dock-/);
   assert.doesNotMatch(styles, /\.research-cycle-panel \{\s*position: sticky;/);
 });
 
-test("human-owned WebMCP telemetry is summarized with an optional disclosure", () => {
-  assert.match(workbench, /webmcp-activity-disclosure/);
-  assert.match(workbench, /<summary>View activity<\/summary>/);
-  assert.match(workbench, /prominent \? \(/);
+test("Workbench HUD keeps Research Cycle and WebMCP distinct and mutually exclusive", () => {
+  assert.match(workbench, /type WorkbenchHudPanel = "research-cycle" \| "webmcp" \| null/);
+  assert.match(hudComponent, /togglePanel\("research-cycle"\)/);
+  assert.match(hudComponent, /togglePanel\("webmcp"\)/);
+  assert.match(hudComponent, /openPanel === panel \? null : panel/);
+  assert.match(hudComponent, /openPanel === "research-cycle"/);
+  assert.match(hudComponent, /openPanel === "webmcp"/);
+  assert.match(hudComponent, /aria-controls="workbench-hud-research-panel"/);
+  assert.match(hudComponent, /aria-controls="workbench-hud-webmcp-panel"/);
+  assert.match(hudComponent, /aria-expanded=\{openPanel === "research-cycle"\}/);
+  assert.match(hudComponent, /aria-expanded=\{openPanel === "webmcp"\}/);
+  assert.doesNotMatch(researchCycleComponent, /WebMCP Activity/);
+});
+
+test("Research Cycle HUD reuses workflow presentation and existing immediate actions", () => {
+  assert.match(hudComponent, /deriveResearchCyclePresentation\(workspace\)/);
+  assert.match(hudComponent, /getResearchCycleStageStatus\(presentation, index\)/);
+  assert.match(hudComponent, /getResearchCycleActionTargetId\(presentation\.state\)/);
+  assert.match(hudComponent, /prompt=\{AGENT_RESEARCH_PROMPT\}/);
+  assert.match(hudComponent, /prompt=\{AGENT_SYNTHESIS_PROMPT\}/);
+  assert.match(hudComponent, /Jump to mission/);
+  assert.match(hudComponent, /Jump to proposals/);
+  assert.match(hudComponent, /Jump to Evidence Brief/);
+  assert.match(hudComponent, /Jump to approved brief/);
+});
+
+test("Workbench HUD is keyboard accessible, non-modal, live, and responsive", () => {
+  assert.match(hudComponent, /event\.key === "Escape"/);
+  assert.match(hudComponent, /document\.addEventListener\("keydown"/);
+  assert.match(hudComponent, /<button/);
+  assert.match(hudComponent, /aria-live="polite" aria-atomic="true"/);
+  assert.doesNotMatch(hudComponent, /role="dialog"|aria-modal|focus\(/);
+  assert.match(styles, /@supports \(backdrop-filter: blur\(12px\)\)/);
+  assert.match(styles, /@media \(max-width: 680px\)[\s\S]*\.workbench-hud/);
+  assert.match(styles, /max-height: min\(68vh, 34rem\)/);
+  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*animation: none/);
 });
 
 test("manual discovery is explicitly optional, agent-first, and collapsible", () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { FormEvent, ReactNode } from "react";
+import type { FormEvent, ReactNode, RefObject } from "react";
 import type {
   SourceDetailsRecord,
   SourceRecord,
@@ -38,6 +38,7 @@ const AGENT_RESEARCH_PROMPT =
 const AGENT_SYNTHESIS_PROMPT =
   "In the WebMCP Research Workbench, read the current research workspace and draft the Evidence Brief for the active mission. Use only the human-accepted evidence already in the workspace when supporting or citing findings. Cite each finding to the accepted source IDs that support it, include relevant caveats about the limits of the evidence, and leave the result for human review. Do not mark it reviewed or approve it.";
 type RequestStatus = "idle" | "loading" | "success" | "error";
+type WorkbenchHudPanel = "research-cycle" | "webmcp" | null;
 
 export function SearchWorkbench() {
   const workspace = useSyncExternalStore(
@@ -60,6 +61,32 @@ export function SearchWorkbench() {
   } | null>(null);
   const activeRequest = useRef<AbortController | null>(null);
   const activeDetailsRequest = useRef<AbortController | null>(null);
+  const researchCyclePanelRef = useRef<HTMLElement | null>(null);
+  const [showResearchCycleControl, setShowResearchCycleControl] = useState(false);
+  const [openHudPanel, setOpenHudPanel] = useState<WorkbenchHudPanel>(null);
+
+  useEffect(() => {
+    const panel = researchCyclePanelRef.current;
+    if (!panel) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const showControl =
+          !entry.isIntersecting && entry.boundingClientRect.bottom <= 0;
+        setShowResearchCycleControl(showControl);
+        if (!showControl) {
+          setOpenHudPanel((current) =>
+            current === "research-cycle" ? null : current,
+          );
+        }
+      },
+      { threshold: 0 },
+    );
+    observer.observe(panel);
+    return () => observer.disconnect();
+  }, []);
 
   function performWorkspaceAction(action: () => void, success: string) {
     try {
@@ -157,7 +184,7 @@ export function SearchWorkbench() {
 
   return (
     <div className="workbench-stack">
-      <ResearchCycle workspace={workspace} />
+      <ResearchCycle panelRef={researchCyclePanelRef} workspace={workspace} />
       <RolesPanel />
 
       <MissionPanel
@@ -331,6 +358,12 @@ export function SearchWorkbench() {
       />
 
       <ActivityPanel workspace={workspace} />
+      <WorkbenchHud
+        openPanel={openHudPanel}
+        onOpenPanelChange={setOpenHudPanel}
+        showResearchCycleControl={showResearchCycleControl}
+        workspace={workspace}
+      />
     </div>
   );
 }
@@ -376,106 +409,22 @@ function RolesPanel() {
   );
 }
 
-function ResearchCycle({ workspace }: { workspace: ResearchWorkspaceState }) {
+function ResearchCycle({
+  panelRef,
+  workspace,
+}: {
+  panelRef: RefObject<HTMLElement | null>;
+  workspace: ResearchWorkspaceState;
+}) {
   const presentation = deriveResearchCyclePresentation(workspace);
-  const panelRef = useRef<HTMLElement | null>(null);
-  const [showCompactDock, setShowCompactDock] = useState(false);
-  const webMcpActivity = useSyncExternalStore(
-    webMcpActivityStore.subscribe,
-    webMcpActivityStore.getSnapshot,
-    webMcpActivityStore.getServerSnapshot,
-  );
-  const [researchCopyFeedback, setResearchCopyFeedback] = useState<{
-    kind: "success" | "error";
-    text: string;
-  } | null>(null);
-  const [synthesisCopyFeedback, setSynthesisCopyFeedback] = useState<{
-    kind: "success" | "error";
-    text: string;
-  } | null>(null);
-
-  useEffect(() => {
-    const panel = panelRef.current;
-    if (!panel) {
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setShowCompactDock(
-          !entry.isIntersecting && entry.boundingClientRect.bottom <= 0,
-        );
-      },
-      { threshold: 0 },
-    );
-    observer.observe(panel);
-    return () => observer.disconnect();
-  }, []);
-
-  function handleJumpToCurrentAction() {
-    const target = document.getElementById(
-      getResearchCycleActionTargetId(presentation.state),
-    );
-    if (!target) {
-      return;
-    }
-    const reducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-    target.scrollIntoView({
-      behavior: reducedMotion ? "auto" : "smooth",
-      block: "start",
-    });
-  }
-
-  async function handleCopyResearchPrompt() {
-    try {
-      if (!navigator.clipboard) {
-        throw new Error("Clipboard API unavailable.");
-      }
-      await navigator.clipboard.writeText(AGENT_RESEARCH_PROMPT);
-      setResearchCopyFeedback({ kind: "success", text: "Research prompt copied." });
-    } catch {
-      setResearchCopyFeedback({
-        kind: "error",
-        text: "Could not copy the research prompt.",
-      });
-    }
-  }
-
-  async function handleCopySynthesisPrompt() {
-    try {
-      if (!navigator.clipboard) {
-        throw new Error("Clipboard API unavailable.");
-      }
-      await navigator.clipboard.writeText(AGENT_SYNTHESIS_PROMPT);
-      setSynthesisCopyFeedback({ kind: "success", text: "Synthesis prompt copied." });
-    } catch {
-      setSynthesisCopyFeedback({
-        kind: "error",
-        text: "Could not copy the synthesis prompt.",
-      });
-    }
-  }
-
-  const activeStageNumber = presentation.activeStageIndex === null
-    ? RESEARCH_CYCLE_STAGES.length
-    : presentation.activeStageIndex + 1;
-  const activeStageLabel = presentation.activeStageIndex === null
-    ? "Complete"
-    : RESEARCH_CYCLE_STAGES[presentation.activeStageIndex].label;
-  const compactOwnerLabel = presentation.owner === "complete"
-    ? "COMPLETE"
-    : presentation.turnLabel;
 
   return (
-    <>
-      <section
-        ref={panelRef}
-        id="research-cycle"
-        className={`research-cycle-panel research-cycle-${presentation.owner}`}
-        aria-labelledby="research-cycle-heading"
-      >
+    <section
+      ref={panelRef}
+      id="research-cycle"
+      className={`research-cycle-panel research-cycle-${presentation.owner}`}
+      aria-labelledby="research-cycle-heading"
+    >
       <div className="research-cycle-heading">
         <div>
           <p className="section-kicker">Live workspace position</p>
@@ -526,134 +475,300 @@ function ResearchCycle({ workspace }: { workspace: ResearchWorkspaceState }) {
           </ul>
         )}
         {presentation.state === "research" && (
-          <div className="cycle-copy-action">
-            <button type="button" onClick={handleCopyResearchPrompt}>
-              Copy research prompt
-            </button>
-            {researchCopyFeedback && (
-              <p
-                className={`copy-feedback ${researchCopyFeedback.kind}`}
-                role={researchCopyFeedback.kind === "error" ? "alert" : "status"}
-                aria-live="polite"
-              >
-                {researchCopyFeedback.text}
-              </p>
-            )}
-          </div>
+          <PromptCopyAction
+            errorMessage="Could not copy the research prompt."
+            label="Copy research prompt"
+            prompt={AGENT_RESEARCH_PROMPT}
+            successMessage="Research prompt copied."
+          />
         )}
         {presentation.state === "synthesize" && (
-          <div className="cycle-copy-action">
-            <button type="button" onClick={handleCopySynthesisPrompt}>
-              Copy synthesis prompt
-            </button>
-            {synthesisCopyFeedback && (
-              <p
-                className={`copy-feedback ${synthesisCopyFeedback.kind}`}
-                role={synthesisCopyFeedback.kind === "error" ? "alert" : "status"}
-                aria-live="polite"
-              >
-                {synthesisCopyFeedback.text}
-              </p>
-            )}
-          </div>
+          <PromptCopyAction
+            errorMessage="Could not copy the synthesis prompt."
+            label="Copy synthesis prompt"
+            prompt={AGENT_SYNTHESIS_PROMPT}
+            successMessage="Synthesis prompt copied."
+          />
         )}
         {presentation.state === "complete" && (
           <ApprovedBriefActions workspace={workspace} />
         )}
         <p className="cycle-next-cue">{presentation.nextStep}</p>
       </div>
-
-        <LiveWebMcpActivity
-          activity={webMcpActivity}
-          prominent={presentation.owner === "agent"}
-        />
-      </section>
-
-      {showCompactDock && (
-        <aside
-          className={`research-cycle-dock research-cycle-dock-${presentation.owner}`}
-          aria-label="Compact Research Cycle"
-          aria-live="polite"
-        >
-          <div className="cycle-dock-meta">
-            <span className="cycle-dock-owner">{compactOwnerLabel}</span>
-            <span className="cycle-dock-progress">
-              Stage {activeStageNumber} / {RESEARCH_CYCLE_STAGES.length}
-            </span>
-          </div>
-          <div className="cycle-dock-copy">
-            <strong>{activeStageLabel}</strong>
-            <span>{presentation.headline}</span>
-          </div>
-          <div className="cycle-dock-controls">
-            <WebMcpActivitySummary activity={webMcpActivity} />
-            <button type="button" onClick={handleJumpToCurrentAction}>
-              Jump to current action
-            </button>
-          </div>
-        </aside>
-      )}
-    </>
-  );
-}
-
-function LiveWebMcpActivity({
-  activity,
-  prominent,
-}: {
-  activity: readonly WebMcpActivityEntry[];
-  prominent: boolean;
-}) {
-  return (
-    <section
-      className={`webmcp-activity ${prominent ? "webmcp-activity-prominent" : "webmcp-activity-compact"}`}
-      aria-labelledby="webmcp-activity-heading"
-      aria-live="polite"
-    >
-      <div className="webmcp-activity-heading">
-        <div>
-          <p className="section-kicker">Structured agent operations</p>
-          <h3 id="webmcp-activity-heading">Live WebMCP Activity</h3>
-        </div>
-        <WebMcpActivitySummary activity={activity} />
-      </div>
-      <p className="webmcp-activity-note">
-        {prominent
-          ? "Watch the five registered WebMCP tools as the agent performs this stage. This shows tool execution, not private reasoning."
-          : "Agent tool activity is paused while control is with you. This browser-local summary resets on reload."}
-      </p>
-      {prominent ? (
-        <WebMcpActivityList activity={activity} />
-      ) : (
-        <details className="webmcp-activity-disclosure">
-          <summary>View activity</summary>
-          <WebMcpActivityList activity={activity} />
-        </details>
-      )}
     </section>
   );
 }
 
-function WebMcpActivitySummary({
-  activity,
+function PromptCopyAction({
+  className = "cycle-copy-action",
+  errorMessage,
+  label,
+  prompt,
+  successMessage,
 }: {
-  activity: readonly WebMcpActivityEntry[];
+  className?: string;
+  errorMessage: string;
+  label: string;
+  prompt: string;
+  successMessage: string;
 }) {
-  const completedCount = activity.filter(
-    (entry) => entry.status === "succeeded",
-  ).length;
+  const [feedback, setFeedback] = useState<{
+    kind: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  async function handleCopy() {
+    try {
+      if (!navigator.clipboard) {
+        throw new Error("Clipboard API unavailable.");
+      }
+      await navigator.clipboard.writeText(prompt);
+      setFeedback({ kind: "success", text: successMessage });
+    } catch {
+      setFeedback({ kind: "error", text: errorMessage });
+    }
+  }
+
+  return (
+    <div className={className}>
+      <button type="button" onClick={handleCopy}>
+        {label}
+      </button>
+      {feedback && (
+        <p
+          className={`copy-feedback ${feedback.kind}`}
+          role={feedback.kind === "error" ? "alert" : "status"}
+          aria-live="polite"
+        >
+          {feedback.text}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function WorkbenchHud({
+  onOpenPanelChange,
+  openPanel,
+  showResearchCycleControl,
+  workspace,
+}: {
+  onOpenPanelChange: (panel: WorkbenchHudPanel) => void;
+  openPanel: WorkbenchHudPanel;
+  showResearchCycleControl: boolean;
+  workspace: ResearchWorkspaceState;
+}) {
+  const presentation = deriveResearchCyclePresentation(workspace);
+  const webMcpActivity = useSyncExternalStore(
+    webMcpActivityStore.subscribe,
+    webMcpActivityStore.getSnapshot,
+    webMcpActivityStore.getServerSnapshot,
+  );
+
+  useEffect(() => {
+    if (!openPanel) {
+      return;
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onOpenPanelChange(null);
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onOpenPanelChange, openPanel]);
+
+  function togglePanel(panel: Exclude<WorkbenchHudPanel, null>) {
+    onOpenPanelChange(openPanel === panel ? null : panel);
+  }
+
+  function handleJumpToCurrentAction() {
+    const target = document.getElementById(
+      getResearchCycleActionTargetId(presentation.state),
+    );
+    if (!target) {
+      return;
+    }
+    const reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    onOpenPanelChange(null);
+    target.scrollIntoView({
+      behavior: reducedMotion ? "auto" : "smooth",
+      block: "start",
+    });
+  }
+
+  const researchSummary = getResearchCycleHudSummary(presentation);
+  const webMcpSummary = getWebMcpHudSummary(webMcpActivity);
+  const ownerLabel = presentation.owner === "complete"
+    ? "Complete"
+    : presentation.owner === "human"
+      ? "Human · Your Turn"
+      : "Agent · Agent's Turn";
+
+  return (
+    <aside className="workbench-hud" aria-label="Workbench HUD">
+      {openPanel === "research-cycle" && showResearchCycleControl && (
+        <section
+          id="workbench-hud-research-panel"
+          className={`workbench-hud-panel hud-research-panel hud-owner-${presentation.owner}`}
+          aria-labelledby="workbench-hud-research-heading"
+        >
+          <div className="hud-panel-heading">
+            <div>
+              <p className="section-kicker">Workflow guidance</p>
+              <h2 id="workbench-hud-research-heading">Research Cycle</h2>
+            </div>
+            <span className="hud-owner-label">{ownerLabel}</span>
+          </div>
+          <ol className="hud-cycle-progress" aria-label="Research cycle progress">
+            {RESEARCH_CYCLE_STAGES.map((stage, index) => {
+              const stageStatus = getResearchCycleStageStatus(presentation, index);
+              return (
+                <li
+                  className={`hud-cycle-stage hud-cycle-stage-${stageStatus}`}
+                  key={stage.label}
+                  aria-current={stageStatus === "current" ? "step" : undefined}
+                  aria-label={`${stage.label}, ${stage.actor}, ${stageStatus}`}
+                >
+                  <span aria-hidden="true">
+                    {stageStatus === "complete" ? "✓" : index + 1}
+                  </span>
+                  <strong>{stage.label}</strong>
+                </li>
+              );
+            })}
+          </ol>
+          <div className="hud-guidance">
+            <p className="cycle-turn-label">{presentation.turnLabel}</p>
+            <h3>{presentation.headline}</h3>
+            <p>{presentation.guidance}</p>
+            <p className="hud-next-step">{presentation.nextStep}</p>
+          </div>
+          {presentation.state === "research" && (
+            <PromptCopyAction
+              className="hud-panel-actions"
+              errorMessage="Could not copy the research prompt."
+              label="Copy research prompt"
+              prompt={AGENT_RESEARCH_PROMPT}
+              successMessage="Research prompt copied."
+            />
+          )}
+          {presentation.state === "synthesize" && (
+            <PromptCopyAction
+              className="hud-panel-actions"
+              errorMessage="Could not copy the synthesis prompt."
+              label="Copy synthesis prompt"
+              prompt={AGENT_SYNTHESIS_PROMPT}
+              successMessage="Synthesis prompt copied."
+            />
+          )}
+          {presentation.state !== "research" &&
+            presentation.state !== "synthesize" && (
+              <div className="hud-panel-actions">
+                <button type="button" onClick={handleJumpToCurrentAction}>
+                  {getResearchCycleHudActionLabel(presentation.state)}
+                </button>
+              </div>
+            )}
+        </section>
+      )}
+
+      {openPanel === "webmcp" && (
+        <section
+          id="workbench-hud-webmcp-panel"
+          className="workbench-hud-panel hud-webmcp-panel"
+          aria-labelledby="workbench-hud-webmcp-heading"
+        >
+          <div className="hud-panel-heading">
+            <div>
+              <p className="section-kicker">Structured browser operations</p>
+              <h2 id="workbench-hud-webmcp-heading">WebMCP Activity</h2>
+            </div>
+            <span className="hud-owner-label hud-agent-label">Agent</span>
+          </div>
+          <p className="hud-panel-note">
+            Live tool execution in this browser only. Activity resets on reload and
+            does not expose private reasoning.
+          </p>
+          <WebMcpActivityList activity={webMcpActivity} />
+        </section>
+      )}
+
+      <div className="workbench-hud-controls">
+        {showResearchCycleControl && (
+          <button
+            type="button"
+            className={`hud-control hud-research-control hud-owner-${presentation.owner}`}
+            aria-controls="workbench-hud-research-panel"
+            aria-expanded={openPanel === "research-cycle"}
+            onClick={() => togglePanel("research-cycle")}
+          >
+            <span className="hud-control-title">Research Cycle</span>
+            <span className="hud-control-status">{researchSummary}</span>
+          </button>
+        )}
+        <button
+          type="button"
+          className="hud-control hud-webmcp-control"
+          aria-controls="workbench-hud-webmcp-panel"
+          aria-expanded={openPanel === "webmcp"}
+          onClick={() => togglePanel("webmcp")}
+        >
+          <span className="hud-control-title">WebMCP</span>
+          <span className="hud-control-status" aria-live="polite" aria-atomic="true">
+            {webMcpSummary}
+          </span>
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+function getResearchCycleHudSummary(
+  presentation: ReturnType<typeof deriveResearchCyclePresentation>,
+) {
+  if (presentation.state === "complete") {
+    return "Complete · Approved";
+  }
+  const stageIndex = presentation.activeStageIndex ?? 0;
+  const turn = presentation.owner === "agent" ? "Agent's Turn" : "Your Turn";
+  return `${turn} · ${RESEARCH_CYCLE_STAGES[stageIndex].label} ${stageIndex + 1}/${RESEARCH_CYCLE_STAGES.length}`;
+}
+
+function getResearchCycleHudActionLabel(
+  state: ReturnType<typeof deriveResearchCyclePresentation>["state"],
+) {
+  switch (state) {
+    case "define":
+      return "Jump to mission";
+    case "curate":
+      return "Jump to proposals";
+    case "review":
+    case "approve":
+      return "Jump to Evidence Brief";
+    case "complete":
+      return "Jump to approved brief";
+    default:
+      return "Jump to current action";
+  }
+}
+
+function getWebMcpHudSummary(activity: readonly WebMcpActivityEntry[]) {
+  const running = activity.find((entry) => entry.status === "running");
+  if (running) {
+    return `${running.name} running`;
+  }
   const invocationCount = activity.reduce(
     (total, entry) => total + entry.invocationCount,
     0,
   );
-
-  return (
-    <span className="webmcp-activity-summary">
-      {invocationCount === 0
-        ? "WebMCP waiting"
-        : `${completedCount}/5 tools · ${invocationCount} call${invocationCount === 1 ? "" : "s"}`}
-    </span>
-  );
+  if (invocationCount === 0) {
+    return `${activity.length} tools`;
+  }
+  const usedCount = activity.filter((entry) => entry.invocationCount > 0).length;
+  return `${usedCount}/${activity.length} used · ${invocationCount} call${invocationCount === 1 ? "" : "s"}`;
 }
 
 function WebMcpActivityList({
