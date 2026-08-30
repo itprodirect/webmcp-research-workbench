@@ -44,7 +44,8 @@ uses the capabilities exposed by the workbench.
 3. The human curates the proposed evidence.
 4. The human tells the agent to continue and synthesize from the accepted evidence.
 5. The agent drafts using only human-accepted evidence.
-6. The human saves any edits, marks the brief reviewed, and approves it.
+6. The human reviews the draft, saves changes only when edits are present, marks the
+   brief reviewed, and approves it.
 7. The approved Markdown can be downloaded or copied.
 
 The optional **Copy example instruction** action remains available as onboarding or
@@ -91,7 +92,8 @@ A persistent unified HUD keeps the current **Research Cycle** status and live
 4. **Human UI:** Accept or reject the proposals.
 5. **Agent:** Tell the agent to continue and synthesize from only the accepted
    evidence.
-6. **Human UI:** Save any edits, mark the brief reviewed, and approve it.
+6. **Human UI:** Review the draft, save changes only when edits are present, mark it
+   reviewed, and approve it.
 7. **Human UI:** Download or copy the approved Markdown artifact.
 
 The unified HUD keeps the Research Cycle position and live WebMCP activity visible

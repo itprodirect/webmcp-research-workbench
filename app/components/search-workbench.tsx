@@ -21,6 +21,12 @@ import {
   getApprovedBriefFilename,
 } from "@/src/client/approved-brief-markdown";
 import {
+  getBriefEditorContentKey,
+  hasUnsavedBriefChanges,
+  saveBriefChangesIfDirty,
+  type EditableBriefContent,
+} from "@/src/client/brief-editor";
+import {
   deriveResearchCyclePresentation,
   getResearchCycleActionTargetId,
   getResearchCycleStageStatus,
@@ -87,15 +93,17 @@ export function SearchWorkbench() {
     return () => observer.disconnect();
   }, []);
 
-  function performWorkspaceAction(action: () => void, success: string) {
+  function performWorkspaceAction<T>(action: () => T, success: string): T | null {
     try {
-      action();
+      const result = action();
       setWorkspaceMessage({ kind: "success", text: success });
+      return result;
     } catch (caught) {
       setWorkspaceMessage({
         kind: "error",
         text: caught instanceof Error ? caught.message : "Workspace action failed.",
       });
+      return null;
     }
   }
 
@@ -337,7 +345,7 @@ export function SearchWorkbench() {
         workspace={workspace}
         onEdit={(input) =>
           performWorkspaceAction(
-            () => workspaceStore.editBrief(input),
+            () => workspaceStore.editBrief(input).brief,
             "Human edits saved; review and approval reset.",
           )
         }
@@ -1292,7 +1300,7 @@ function BriefPanel({
   onApprove,
 }: {
   workspace: ResearchWorkspaceState;
-  onEdit: (input: unknown) => void;
+  onEdit: (input: unknown) => EditableBriefContent | null;
   onReview: () => void;
   onApprove: () => void;
 }) {
@@ -1300,6 +1308,15 @@ function BriefPanel({
   const acceptedEvidence = workspace.accepted_evidence;
   const briefFormRef = useRef<HTMLFormElement | null>(null);
   const [workflowError, setWorkflowError] = useState("");
+  const editorKey = brief ? getBriefEditorContentKey(brief) : "empty-brief";
+  const [dirtyState, setDirtyState] = useState({
+    editorKey,
+    isDirty: false,
+  });
+  const [saveConfirmation, setSaveConfirmation] = useState<{
+    editorKey: string;
+    text: string;
+  } | null>(null);
 
   if (!brief) {
     const isReadyForSynthesis = acceptedEvidence.length > 0;
@@ -1342,6 +1359,8 @@ function BriefPanel({
   }
 
   const savedBrief = brief;
+  const isDirty =
+    dirtyState.editorKey === editorKey && dirtyState.isDirty;
 
   function readBriefForm(form: HTMLFormElement) {
     const formData = new FormData(form);
@@ -1357,28 +1376,38 @@ function BriefPanel({
   }
 
   function hasUnsavedFormChanges(form: HTMLFormElement) {
-    const formBrief = readBriefForm(form);
-    return (
-      formBrief.title !== savedBrief.title ||
-      formBrief.summary !== savedBrief.summary ||
-      formBrief.caveats !== savedBrief.caveats ||
-      formBrief.findings.some((finding, index) => {
-        const savedFinding = savedBrief.findings[index];
-        return (
-          finding.statement !== savedFinding.statement ||
-          finding.source_ids.length !== savedFinding.source_ids.length ||
-          finding.source_ids.some(
-            (sourceId) => !savedFinding.source_ids.includes(sourceId),
-          )
-        );
-      })
-    );
+    return hasUnsavedBriefChanges(savedBrief, readBriefForm(form));
+  }
+
+  function handleFormChange(event: FormEvent<HTMLFormElement>) {
+    setDirtyState({
+      editorKey,
+      isDirty: hasUnsavedFormChanges(event.currentTarget),
+    });
+    setSaveConfirmation(null);
+    setWorkflowError("");
   }
 
   function handleEdit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setWorkflowError("");
-    onEdit(readBriefForm(event.currentTarget));
+    const result = saveBriefChangesIfDirty(
+      savedBrief,
+      readBriefForm(event.currentTarget),
+      onEdit,
+    );
+    if (result.status === "unchanged") {
+      setDirtyState({ editorKey, isDirty: false });
+      setSaveConfirmation(null);
+      return;
+    }
+    if (result.status === "saved") {
+      setDirtyState({ editorKey, isDirty: false });
+      setSaveConfirmation({
+        editorKey: result.editorKey,
+        text: "Changes saved",
+      });
+    }
   }
 
   function handleReview() {
@@ -1410,8 +1439,9 @@ function BriefPanel({
   const editor = (
     <form
       className="brief-form"
-      key={brief.updated_at}
+      key={editorKey}
       ref={briefFormRef}
+      onChange={handleFormChange}
       onSubmit={handleEdit}
     >
       <div className="field full-field">
@@ -1425,7 +1455,7 @@ function BriefPanel({
       <div className="findings-editor">
         <h3>Findings</h3>
         {brief.findings.map((finding, index) => (
-          <fieldset className="finding-fieldset" key={`${brief.updated_at}-${index}`}>
+          <fieldset className="finding-fieldset" key={index}>
             <legend>Finding {index + 1}</legend>
             <div className="field full-field">
               <label htmlFor={`finding-${index}-statement`}>Statement</label>
@@ -1465,7 +1495,19 @@ function BriefPanel({
         <textarea className="brief-caveats" id="brief-caveats" name="brief-caveats" defaultValue={brief.caveats} maxLength={1000} rows={5} />
       </div>
       <div className="form-actions brief-save-actions">
-        <button type="submit">Save human edits</button>
+        <p
+          className={`brief-save-status${isDirty ? " brief-save-status-dirty" : ""}`}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {isDirty
+            ? "Unsaved changes"
+            : saveConfirmation?.editorKey === editorKey
+              ? saveConfirmation.text
+              : "All changes saved"}
+        </p>
+        <button type="submit" disabled={!isDirty}>Save changes</button>
         {(brief.human_reviewed || brief.approved) && (
           <span>Saving new edits resets review and approval.</span>
         )}
@@ -1505,7 +1547,7 @@ function BriefPanel({
             Review the brief. If you changed the content, save your edits first.
             When you&apos;re satisfied with the saved content, mark it reviewed.
           </p>
-          <button type="button" onClick={handleReview}>Mark reviewed</button>
+          <button type="button" disabled={isDirty} onClick={handleReview}>Mark reviewed</button>
         </div>
       )}
       {brief.human_reviewed && !brief.approved && (
@@ -1516,7 +1558,7 @@ function BriefPanel({
             Approve the brief when you&apos;re satisfied this is the final
             human-authorized artifact.
           </p>
-          <button type="button" onClick={handleApprove}>Approve brief</button>
+          <button type="button" disabled={isDirty} onClick={handleApprove}>Approve brief</button>
         </div>
       )}
       {brief.approved && (
