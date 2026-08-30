@@ -101,7 +101,7 @@ test("the full cycle hands off to an action-linked bottom-right Workbench HUD", 
   assert.match(workbench, /aria-label="Workbench HUD"/);
   assert.match(hudComponent, /Your Turn/);
   assert.match(hudComponent, /Agent's Turn/);
-  assert.match(hudComponent, /Complete · Approved/);
+  assert.match(researchCycle, /Complete · Approved/);
   assert.match(workbench, /getResearchCycleActionTargetId\(presentation\.state\)/);
   assert.match(workbench, /scrollIntoView/);
   assert.match(workbench, /prefers-reduced-motion: reduce/);
@@ -147,6 +147,36 @@ test("Research Cycle HUD reuses workflow presentation and existing immediate act
   assert.match(hudComponent, /getResearchCycleInteractionCue\(presentation\.state\)/);
   assert.match(hudComponent, /className="hud-interaction-cue"/);
   assert.match(styles, /\.hud-interaction-cue \{/);
+});
+
+test("agent-owned HUD stages use a truthful stage-local WebMCP activity baseline", () => {
+  assert.match(workbench, /key=\{researchCycleState\}/);
+  assert.match(hudComponent, /const \[stageEntryInvocationCount\] = useState\(/);
+  assert.match(hudComponent, /getWebMcpInvocationCount\(webMcpActivity\)/);
+  assert.match(hudComponent, /deriveResearchCycleActivityState\(/);
+  assert.match(researchCycle, /currentInvocationCount > stageEntryInvocationCount/);
+  assert.match(researchCycle, /WAITING FOR AGENT/);
+  assert.match(researchCycle, /AGENT WORK IN PROGRESS/);
+  assert.match(researchCycle, /WebMCP activity received/);
+  assert.match(researchCycle, /Waiting for agent/);
+  assert.match(researchCycle, /Agent working/);
+  assert.doesNotMatch(hudComponent, /setTimeout|setInterval/);
+});
+
+test("agent handoff activity is live, decorative, and reduced-motion safe", () => {
+  assert.match(hudComponent, /className=\{`hud-agent-activity/);
+  assert.match(hudComponent, /role="status"/);
+  assert.match(hudComponent, /aria-live="polite"/);
+  assert.match(hudComponent, /aria-atomic="true"/);
+  assert.match(
+    hudComponent,
+    /className="hud-agent-activity-indicator" aria-hidden="true"/,
+  );
+  assert.match(styles, /@keyframes research-cycle-agent-pulse/);
+  assert.match(
+    styles,
+    /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.hud-agent-activity-indicator,[\s\S]*animation: none/,
+  );
 });
 
 test("Workbench HUD is keyboard accessible, non-modal, live, and responsive", () => {
@@ -258,7 +288,7 @@ test("approved artifact actions are human-visible and browser-local only", () =>
   const end = workbench.indexOf("function MissionPanel", start);
   const approvedActions = workbench.slice(start, end);
 
-  assert.match(workbench, /presentation\.state === "complete"/);
+  assert.match(researchCycle, /activityState === "complete"/);
   assert.match(approvedActions, /Download approved brief \(\.md\)/);
   assert.match(approvedActions, /Copy approved brief/);
   assert.match(approvedActions, /data:text\/markdown;charset=utf-8/);
