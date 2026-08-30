@@ -6,9 +6,11 @@ evidence membership and conclusions.
 
 ## Live application
 
-<https://webmcp-research-workbench.vercel.app/>
+Primary: <https://research.itprodirect.com/>
 
-**V0 status:** `WEBMCP RESEARCH WORKBENCH V0 — PRODUCT FROZEN FOR SUBMISSION`
+Vercel fallback: <https://webmcp-research-workbench.vercel.app/>
+
+**V0 status:** `V0 PRODUCT CODE COMPLETE — FINAL HUMAN HANDOFF ACCEPTANCE PENDING`
 
 ## Why WebMCP
 
@@ -56,9 +58,10 @@ fallback, but copying a prompt is not the required or default interaction model.
 A persistent unified HUD keeps the current **Research Cycle** status and live
 **WebMCP** activity available while the human and agent move through the workspace.
 When the full cycle is offscreen, each new workflow state surfaces the Research
-Cycle coach once. Its compact cue directs agent-owned work through **chat / voice**,
-human-owned decisions through the **Workbench**, and exposes the approved artifact
-when the cycle is complete.
+Cycle coach once. Before new stage-local WebMCP activity, an agent-owned stage shows
+**WAITING FOR AGENT** and directs the human to **USE CHAT / VOICE**. Once real
+activity arrives, it shows **AGENT WORK IN PROGRESS** and **NO ACTION NEEDED**.
+Human-owned stages show **USE WORKBENCH**, and completion shows **ARTIFACT READY**.
 
 ## Exactly five WebMCP tools
 
@@ -114,15 +117,16 @@ Open <http://localhost:3000/>.
 
 ## Validation
 
-Accepted frozen V0 validation at
-`7b3b500529c08c2c35d51a50228d088d802cdd83`:
+Current canonical validation at
+`5b48d931142ba09a2f0135e404ecad282ddc327b`:
 
-- `npm test` — 74/74 PASS
+- `npm test` — 93/93 PASS
 - `npm run lint` — PASS
 - `npm run build` — PASS
-- independent Claude HUD review — ACCEPT
-- independent Claude demo-usability review — ACCEPT
-- production smoke validation — PASS
+- production deployment — PASS
+- `research.itprodirect.com` — HTTP 200
+- Vercel fallback — HTTP 200
+- PR #10 production handoff smoke — PASS
 
 Run the local validators with:
 
@@ -138,8 +142,8 @@ WebMCP tool discovery and invocation require a browser or client environment wit
 WebMCP support enabled. The repository does not claim universal client or browser-
 version compatibility. The historical Phase 2A and Phase 2B deployment records
 capture the supported Codex In-app Browser observations and limitations at those
-gates. The frozen V0 was subsequently exercised on public production in Windows
-ChatGPT Work; see the dogfood records for those observations.
+gates. V0 was subsequently exercised on public production in Windows ChatGPT Work;
+see the dogfood records for those observations.
 
 ## Documentation
 
@@ -168,6 +172,8 @@ evidence where later V0 decisions supersede their earlier expectations.
 20. [Dogfood After-Action Report V0](docs/19-dogfood-after-action-report-v0.md)
 21. [V0 Product Freeze](docs/20-v0-product-freeze.md)
 22. [Phase 3 historical after-action report](docs/21-phase-3-aar-historical.md)
+23. [Final dogfood checkpoint — 2026-08-30](docs/22-final-dogfood-checkpoint-2026-08-30.md)
+24. [Final human acceptance runbook](docs/23-final-human-acceptance-runbook.md)
 
 ## License
 

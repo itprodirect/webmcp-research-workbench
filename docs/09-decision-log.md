@@ -34,6 +34,11 @@ This is a living record. “Decided” means the current Planning Baseline V0; c
 | D-028 | Phase 2B tool set | Decided | Register exactly five application tools: `get_research_workspace`, `search_sources`, `get_source_details`, `propose_evidence`, and `draft_evidence_brief`. | The set covers shared context, provider retrieval, staged handoff, and bounded drafting without autonomous acceptance or publishing. | Stop for explicit approval before adding any tool. | Phase 2B. |
 | D-029 | Phase 2B persistence | Decided | Persist a bounded, schema-versioned workspace in client `localStorage`; reject malformed or unsupported persisted state safely and provide deterministic reset. | Human and agent need the same visible state across refresh without adding a database or authentication. | A later explicit durable-data architecture decision. | Phase 2B. |
 | D-030 | OpenAlex semantic search | Decided | Optionally expose `mode: keyword | semantic`, defaulting to keyword; semantic mode uses OpenAlex Works `search.semantic` directly. | Official OpenAlex-hosted semantic search satisfies the bounded need without embeddings, a vector database, a runtime model, or a new provider. | Official OpenAlex behavior or limits change. | Phase 2B. |
+| D-031 | Workspace persistence lifetime | Decided | Use browser `sessionStorage`, not `localStorage`: same-tab refresh persists, while a new browser session starts clean. | Repeated Windows ChatGPT Work dogfooding showed cross-session stale state was a demo and product usability blocker. | A later explicit durable-data architecture decision. | Effective for the V0 submission candidate; supersedes D-029's `localStorage` lifetime decision. |
+| D-032 | Primary interaction model | Decided | Use voice/chat as the natural human-to-agent delegation channel. Keep the visible Workbench as the human authority surface for mission, evidence membership, editing, review, and approval. Agent-owned stages require an explicit conversational handoff; the webpage does not autonomously wake the external agent. | Dogfooding showed that conversational delegation is natural while visible human decisions preserve the clearest authority boundary. | Validated post-submission interaction evidence and an explicit authority review. | Effective for the V0 demo and submission. |
+| D-033 | Handoff activity truthfulness | Decided | Claim agent work is in progress only after real stage-local WebMCP activity is observed. Historical calls do not count toward a new stage; do not use timers, inferred thinking state, or private reasoning indicators. | The page can observe WebMCP invocation telemetry, but it cannot truthfully know that a human spoke to ChatGPT or that the external agent is thinking. | A future explicit, trustworthy agent-presence protocol and security review. | Enforce for V0. |
+| D-034 | Primary production URL | Decided | Use <https://research.itprodirect.com/> as the primary judge/demo URL; keep <https://webmcp-research-workbench.vercel.app/> as a supported fallback. | The custom domain gives the product a simpler identity and reduces voice-navigation friction. | A genuine availability or ownership problem with the primary domain. | Effective for final acceptance and submission. |
+| D-035 | Canonical final artifact | Decided | Keep approved Markdown as the canonical V0 export; do not add DOCX/PDF generation before submission. | Dogfood showed that generic “create document” wording can cause external-agent scope drift. Explicit runbook wording or direct human download solves that problem without expanding product formats. | Validated post-submission demand and an explicit format/export design. | Enforce through submission. |
 
 ## Phase 2B supersession — 2026-08-27
 
@@ -49,3 +54,16 @@ The superseding boundary is narrow:
 - autonomous publishing, export, submission, or other outward mutation remains prohibited.
 
 All other trust and scope constraints continue, including OpenAlex-only retrieval, untrusted provider content, no runtime LLM, no database/authentication, no arbitrary-URL fetching, no credibility score, no private evidence, and no secrets.
+
+## End-of-day dogfood supersession — 2026-08-30
+
+D-031 explicitly supersedes only the browser-storage lifetime in D-029: the
+workspace remains bounded and schema-versioned, but it now uses `sessionStorage`
+rather than `localStorage`. Same-tab refresh remains supported, a new browser
+session starts clean, legacy `localStorage` is ignored rather than deleted, and the
+explicit Reset action remains available.
+
+D-032 through D-035 record the interaction, telemetry, production-domain, and
+artifact-format decisions established by the later Windows ChatGPT Work dogfood
+cycle. They do not expand agent authority: the human still owns mission definition,
+evidence membership, editing, review, approval, export, and destructive reset.
