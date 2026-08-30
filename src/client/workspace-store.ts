@@ -125,7 +125,7 @@ function browserStorage(): WorkspaceStorage | null {
     return null;
   }
   try {
-    return window.localStorage;
+    return window.sessionStorage;
   } catch {
     return null;
   }

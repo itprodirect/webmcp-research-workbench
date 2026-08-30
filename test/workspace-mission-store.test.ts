@@ -67,10 +67,11 @@ test("shared store notifies subscribers and reset clears state and persistence",
   assert.deepEqual(store.getSnapshot(), store.getServerSnapshot());
   assert.equal(storage.getItem(WORKSPACE_STORAGE_KEY), null);
   assert.equal(notifications, 2);
+  assert.equal(createWorkspaceStore({ storage, now }).getSnapshot().mission, null);
   unsubscribe();
 });
 
-test("workspace persistence survives a validated round trip", () => {
+test("workspace persistence survives a validated same-session round trip", () => {
   const storage = new MemoryStorage();
   const first = createWorkspaceStore({ storage, now });
   first.setMission({ question: "Persist this mission", context: "Reviewers", evidence_max: 4 });
@@ -78,6 +79,56 @@ test("workspace persistence survives a validated round trip", () => {
   const second = createWorkspaceStore({ storage, now });
   assert.deepEqual(second.getSnapshot(), first.getSnapshot());
   assert.equal(second.getSnapshot().schema_version, WORKSPACE_SCHEMA_VERSION);
+});
+
+test("a fresh browser session starts with an empty workspace", () => {
+  const firstSession = new MemoryStorage();
+  const first = createWorkspaceStore({ storage: firstSession, now });
+  first.setMission({ question: "Keep this only in the first session" });
+
+  const freshSession = new MemoryStorage();
+  const second = createWorkspaceStore({ storage: freshSession, now });
+  assert.deepEqual(second.getSnapshot(), second.getServerSnapshot());
+  assert.equal(second.getSnapshot().mission, null);
+});
+
+test("browser default uses sessionStorage and ignores legacy localStorage", () => {
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const legacyLocalStorage = new MemoryStorage();
+  const legacyStore = createWorkspaceStore({ storage: legacyLocalStorage, now });
+  legacyStore.setMission({ question: "Legacy persisted mission" });
+  const legacyRaw = legacyLocalStorage.getItem(WORKSPACE_STORAGE_KEY);
+  const sessionStorage = new MemoryStorage();
+
+  try {
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: { localStorage: legacyLocalStorage, sessionStorage },
+    });
+
+    const first = createWorkspaceStore({ now });
+    assert.equal(first.getSnapshot().mission, null);
+    first.setMission({ question: "Current session mission" });
+    assert.ok(sessionStorage.getItem(WORKSPACE_STORAGE_KEY));
+    assert.equal(legacyLocalStorage.getItem(WORKSPACE_STORAGE_KEY), legacyRaw);
+
+    const sameSession = createWorkspaceStore({ now });
+    assert.deepEqual(sameSession.getSnapshot(), first.getSnapshot());
+
+    const freshSession = new MemoryStorage();
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: { localStorage: legacyLocalStorage, sessionStorage: freshSession },
+    });
+    assert.equal(createWorkspaceStore({ now }).getSnapshot().mission, null);
+    assert.equal(legacyLocalStorage.getItem(WORKSPACE_STORAGE_KEY), legacyRaw);
+  } finally {
+    if (originalWindow) {
+      Object.defineProperty(globalThis, "window", originalWindow);
+    } else {
+      Reflect.deleteProperty(globalThis, "window");
+    }
+  }
 });
 
 test("malformed JSON and unsupported workspace versions fall back safely", () => {

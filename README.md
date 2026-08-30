@@ -71,8 +71,9 @@ A persistent unified HUD keeps the current **Research Cycle** status and live
 - There is no embedded/runtime LLM and no OpenAI API integration.
 - Agent operations use structured tools, not DOM actuation or UI scraping.
 - There are no embeddings, vector database, backend database, or authentication.
-- One bounded, versioned browser `localStorage` workspace is shared by the human UI
-  and the WebMCP adapter.
+- One bounded, versioned browser `sessionStorage` workspace is shared by the human
+  UI and the WebMCP adapter. It survives same-tab refreshes, while a new browser
+  session starts clean.
 - External provider titles, abstracts, metadata, and URLs remain inert, untrusted
   evidence rather than instructions or credibility assessments.
 - Every brief finding may cite only evidence already accepted by a human.
