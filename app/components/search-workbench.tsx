@@ -639,7 +639,10 @@ function WorkbenchHud({
     presentation,
     researchCycleActivityState,
   );
-  const interactionCue = getResearchCycleInteractionCue(presentation.state);
+  const interactionCue = getResearchCycleInteractionCue(
+    presentation.state,
+    researchCycleActivityState,
+  );
   const webMcpSummary = getWebMcpHudSummary(webMcpActivity);
   const ownerLabel = presentation.owner === "complete"
     ? "Complete"

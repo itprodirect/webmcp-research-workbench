@@ -26,7 +26,11 @@ export type ResearchCycleActivityState =
   | "complete";
 
 export type ResearchCycleInteractionCue = {
-  label: "USE CHAT / VOICE" | "USE WORKBENCH" | "ARTIFACT READY";
+  label:
+    | "USE CHAT / VOICE"
+    | "NO ACTION NEEDED"
+    | "USE WORKBENCH"
+    | "ARTIFACT READY";
   supportingText: string;
 };
 
@@ -60,10 +64,18 @@ export function shouldAutoOpenResearchCycleHud(
 
 export function getResearchCycleInteractionCue(
   state: ResearchCycleState,
+  activityState: ResearchCycleActivityState,
 ): ResearchCycleInteractionCue {
   switch (state) {
     case "research":
     case "synthesize":
+      if (activityState === "agent_work_in_progress") {
+        return {
+          label: "NO ACTION NEEDED",
+          supportingText:
+            "WebMCP activity received. Wait for the Workbench to hand control back.",
+        };
+      }
       return {
         label: "USE CHAT / VOICE",
         supportingText: "Tell your agent to continue.",

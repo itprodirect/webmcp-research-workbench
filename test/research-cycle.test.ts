@@ -138,9 +138,14 @@ test("maps every presentation state to an explicit interaction mode", () => {
       "approve",
       "complete",
     ].map((state) =>
-      getResearchCycleInteractionCue(state as ReturnType<
-        typeof deriveResearchCyclePresentation
-      >["state"]),
+      getResearchCycleInteractionCue(
+        state as ReturnType<typeof deriveResearchCyclePresentation>["state"],
+        state === "complete"
+          ? "complete"
+          : state === "research" || state === "synthesize"
+            ? "waiting_for_agent"
+            : "human_turn",
+      ),
     ),
     [
       { label: "USE WORKBENCH", supportingText: "Set the mission in the Workbench." },
@@ -152,6 +157,36 @@ test("maps every presentation state to an explicit interaction mode", () => {
       { label: "ARTIFACT READY", supportingText: "Download or copy the approved brief." },
     ],
   );
+});
+
+test("agent interaction cues request handoff only while waiting", () => {
+  for (const state of ["research", "synthesize"] as const) {
+    const waitingActivity = getResearchCycleAgentActivityCue("waiting_for_agent");
+    const waitingInteraction = getResearchCycleInteractionCue(
+      state,
+      "waiting_for_agent",
+    );
+    assert.equal(waitingActivity?.label, "WAITING FOR AGENT");
+    assert.deepEqual(waitingInteraction, {
+      label: "USE CHAT / VOICE",
+      supportingText: "Tell your agent to continue.",
+    });
+
+    const workingActivity = getResearchCycleAgentActivityCue(
+      "agent_work_in_progress",
+    );
+    const workingInteraction = getResearchCycleInteractionCue(
+      state,
+      "agent_work_in_progress",
+    );
+    assert.equal(workingActivity?.label, "AGENT WORK IN PROGRESS");
+    assert.deepEqual(workingInteraction, {
+      label: "NO ACTION NEEDED",
+      supportingText:
+        "WebMCP activity received. Wait for the Workbench to hand control back.",
+    });
+    assert.doesNotMatch(workingInteraction.supportingText, /continue/i);
+  }
 });
 
 test("agent-owned stages wait for new stage-local activity, then remain in progress between calls", () => {

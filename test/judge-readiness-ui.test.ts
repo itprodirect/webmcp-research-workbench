@@ -144,7 +144,10 @@ test("Research Cycle HUD reuses workflow presentation and existing immediate act
   assert.match(hudComponent, /Jump to proposals/);
   assert.match(hudComponent, /Jump to Evidence Brief/);
   assert.match(hudComponent, /Jump to approved brief/);
-  assert.match(hudComponent, /getResearchCycleInteractionCue\(presentation\.state\)/);
+  assert.match(
+    hudComponent,
+    /getResearchCycleInteractionCue\([\s\S]*presentation\.state,[\s\S]*researchCycleActivityState/,
+  );
   assert.match(hudComponent, /className="hud-interaction-cue"/);
   assert.match(styles, /\.hud-interaction-cue \{/);
 });
@@ -157,6 +160,7 @@ test("agent-owned HUD stages use a truthful stage-local WebMCP activity baseline
   assert.match(researchCycle, /currentInvocationCount > stageEntryInvocationCount/);
   assert.match(researchCycle, /WAITING FOR AGENT/);
   assert.match(researchCycle, /AGENT WORK IN PROGRESS/);
+  assert.match(researchCycle, /NO ACTION NEEDED/);
   assert.match(researchCycle, /WebMCP activity received/);
   assert.match(researchCycle, /Waiting for agent/);
   assert.match(researchCycle, /Agent working/);
