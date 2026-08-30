@@ -29,8 +29,10 @@ import {
 import {
   deriveResearchCyclePresentation,
   getResearchCycleActionTargetId,
+  getResearchCycleInteractionCue,
   getResearchCycleStageStatus,
   RESEARCH_CYCLE_STAGES,
+  shouldAutoOpenResearchCycleHud,
 } from "@/src/client/research-cycle";
 import {
   webMcpActivityStore,
@@ -69,6 +71,8 @@ export function SearchWorkbench() {
   const researchCyclePanelRef = useRef<HTMLElement | null>(null);
   const [showResearchCycleControl, setShowResearchCycleControl] = useState(false);
   const [openHudPanel, setOpenHudPanel] = useState<WorkbenchHudPanel>(null);
+  const researchCycleState = deriveResearchCyclePresentation(workspace).state;
+  const previousResearchCycleState = useRef(researchCycleState);
 
   useEffect(() => {
     const panel = researchCyclePanelRef.current;
@@ -92,6 +96,20 @@ export function SearchWorkbench() {
     observer.observe(panel);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    const previousState = previousResearchCycleState.current;
+    previousResearchCycleState.current = researchCycleState;
+    if (
+      shouldAutoOpenResearchCycleHud(
+        previousState,
+        researchCycleState,
+        showResearchCycleControl,
+      )
+    ) {
+      setOpenHudPanel("research-cycle");
+    }
+  }, [researchCycleState, showResearchCycleControl]);
 
   function performWorkspaceAction<T>(action: () => T, success: string): T | null {
     try {
@@ -603,6 +621,7 @@ function WorkbenchHud({
   }
 
   const researchSummary = getResearchCycleHudSummary(presentation);
+  const interactionCue = getResearchCycleInteractionCue(presentation.state);
   const webMcpSummary = getWebMcpHudSummary(webMcpActivity);
   const ownerLabel = presentation.owner === "complete"
     ? "Complete"
@@ -644,6 +663,10 @@ function WorkbenchHud({
             })}
           </ol>
           <div className="hud-guidance">
+            <div className="hud-interaction-cue">
+              <strong>{interactionCue.label}</strong>
+              <span>{interactionCue.supportingText}</span>
+            </div>
             <p className="cycle-turn-label">{presentation.turnLabel}</p>
             <h3>{presentation.headline}</h3>
             <p>{presentation.guidance}</p>
@@ -916,12 +939,13 @@ function MissionPanel({
         evidence proposals, and the final brief.
       </p>
       <p className="example-text" id="mission-guidance">
-        <strong>Example:</strong> How effective are heat-pump retrofits at reducing
-        residential energy use in cold climates?
+        <strong>Example:</strong> What recent evidence shows which indirect
+        prompt-injection defenses remain effective against adaptive attacks on
+        tool-using AI agents?
       </p>
       <p className="example-text" id="context-guidance">
-        <strong>Audience/context example:</strong> Briefing for a city sustainability
-        team evaluating retrofit incentives.
+        <strong>Audience/context example:</strong> Briefing for an AI-security research
+        team evaluating safeguards for browser and tool-using agents.
       </p>
       <p className="authority-note">
         Only the visible human interface can set or change the mission. Reset before

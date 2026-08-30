@@ -34,6 +34,18 @@ test("judge-facing framing teaches the five-step human-agent workflow", () => {
   assert.match(workbench, /aria-current=\{stageStatus === "current" \? "step" : undefined\}/);
 });
 
+test("current mission guidance uses the judge-facing AI-security examples", () => {
+  assert.match(
+    workbench,
+    /What recent evidence shows which indirect\s+prompt-injection defenses remain effective against adaptive attacks on\s+tool-using AI agents\?/,
+  );
+  assert.match(
+    workbench,
+    /Briefing for an AI-security research\s+team evaluating safeguards for browser and tool-using agents\./,
+  );
+  assert.doesNotMatch(workbench, /heat-pump|sustainability/i);
+});
+
 test("Research is conversational-first with an optional clipboard example", () => {
   assert.match(researchCycle, /Tell your agent to research this mission using the Workbench/);
   assert.match(workbench, /prompt=\{AGENT_RESEARCH_PROMPT\}/);
@@ -100,6 +112,14 @@ test("the full cycle hands off to an action-linked bottom-right Workbench HUD", 
   assert.doesNotMatch(styles, /\.research-cycle-panel \{\s*position: sticky;/);
 });
 
+test("offscreen semantic transitions surface the Research Cycle coach once", () => {
+  assert.match(workbench, /const previousResearchCycleState = useRef\(researchCycleState\)/);
+  assert.match(workbench, /shouldAutoOpenResearchCycleHud\(/);
+  assert.match(workbench, /previousResearchCycleState\.current = researchCycleState/);
+  assert.match(workbench, /setOpenHudPanel\("research-cycle"\)/);
+  assert.match(workbench, /\[researchCycleState, showResearchCycleControl\]/);
+});
+
 test("Workbench HUD keeps Research Cycle and WebMCP distinct and mutually exclusive", () => {
   assert.match(workbench, /type WorkbenchHudPanel = "research-cycle" \| "webmcp" \| null/);
   assert.match(hudComponent, /togglePanel\("research-cycle"\)/);
@@ -124,6 +144,9 @@ test("Research Cycle HUD reuses workflow presentation and existing immediate act
   assert.match(hudComponent, /Jump to proposals/);
   assert.match(hudComponent, /Jump to Evidence Brief/);
   assert.match(hudComponent, /Jump to approved brief/);
+  assert.match(hudComponent, /getResearchCycleInteractionCue\(presentation\.state\)/);
+  assert.match(hudComponent, /className="hud-interaction-cue"/);
+  assert.match(styles, /\.hud-interaction-cue \{/);
 });
 
 test("Workbench HUD is keyboard accessible, non-modal, live, and responsive", () => {

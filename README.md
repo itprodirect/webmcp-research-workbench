@@ -55,6 +55,10 @@ fallback, but copying a prompt is not the required or default interaction model.
 
 A persistent unified HUD keeps the current **Research Cycle** status and live
 **WebMCP** activity available while the human and agent move through the workspace.
+When the full cycle is offscreen, each new workflow state surfaces the Research
+Cycle coach once. Its compact cue directs agent-owned work through **chat / voice**,
+human-owned decisions through the **Workbench**, and exposes the approved artifact
+when the cycle is complete.
 
 ## Exactly five WebMCP tools
 

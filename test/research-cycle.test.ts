@@ -3,7 +3,9 @@ import test from "node:test";
 import {
   deriveResearchCyclePresentation,
   getResearchCycleActionTargetId,
+  getResearchCycleInteractionCue,
   getResearchCycleStageStatus,
+  shouldAutoOpenResearchCycleHud,
 } from "../src/client/research-cycle.ts";
 import type {
   EvidenceBrief,
@@ -120,4 +122,43 @@ test("maps every presentation state to its existing human action surface", () =>
       "approved-brief-actions",
     ],
   );
+});
+
+test("maps every presentation state to an explicit interaction mode", () => {
+  assert.deepEqual(
+    [
+      "define",
+      "research",
+      "curate",
+      "synthesize",
+      "review",
+      "approve",
+      "complete",
+    ].map((state) =>
+      getResearchCycleInteractionCue(state as ReturnType<
+        typeof deriveResearchCyclePresentation
+      >["state"]),
+    ),
+    [
+      { label: "USE WORKBENCH", supportingText: "Set the mission in the Workbench." },
+      { label: "USE CHAT / VOICE", supportingText: "Tell your agent to continue." },
+      { label: "USE WORKBENCH", supportingText: "Review and decide in the Workbench." },
+      { label: "USE CHAT / VOICE", supportingText: "Tell your agent to continue." },
+      { label: "USE WORKBENCH", supportingText: "Review and decide in the Workbench." },
+      { label: "USE WORKBENCH", supportingText: "Review and decide in the Workbench." },
+      { label: "ARTIFACT READY", supportingText: "Download or copy the approved brief." },
+    ],
+  );
+});
+
+test("auto-opens only once per offscreen Research Cycle state transition", () => {
+  assert.equal(shouldAutoOpenResearchCycleHud(null, "define", true), false);
+  assert.equal(shouldAutoOpenResearchCycleHud("research", "research", true), false);
+  assert.equal(shouldAutoOpenResearchCycleHud("research", "curate", false), false);
+  assert.equal(shouldAutoOpenResearchCycleHud("research", "curate", true), true);
+
+  // A manual close does not change the semantic state, so stable rerenders stay closed.
+  assert.equal(shouldAutoOpenResearchCycleHud("curate", "curate", true), false);
+  // The next semantic transition is eligible to surface the coach again.
+  assert.equal(shouldAutoOpenResearchCycleHud("curate", "synthesize", true), true);
 });
