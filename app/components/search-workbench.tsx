@@ -27,8 +27,11 @@ import {
   type EditableBriefContent,
 } from "@/src/client/brief-editor";
 import {
+  deriveResearchCycleActivityState,
   deriveResearchCyclePresentation,
   getResearchCycleActionTargetId,
+  getResearchCycleAgentActivityCue,
+  getResearchCycleHudSummary,
   getResearchCycleInteractionCue,
   getResearchCycleStageStatus,
   RESEARCH_CYCLE_STAGES,
@@ -383,6 +386,7 @@ export function SearchWorkbench() {
 
       <ActivityPanel workspace={workspace} />
       <WorkbenchHud
+        key={researchCycleState}
         openPanel={openHudPanel}
         onOpenPanelChange={setOpenHudPanel}
         showResearchCycleControl={showResearchCycleControl}
@@ -585,6 +589,17 @@ function WorkbenchHud({
     webMcpActivityStore.getSnapshot,
     webMcpActivityStore.getServerSnapshot,
   );
+  const [stageEntryInvocationCount] = useState(() =>
+    getWebMcpInvocationCount(webMcpActivity),
+  );
+  const researchCycleActivityState = deriveResearchCycleActivityState(
+    presentation.state,
+    stageEntryInvocationCount,
+    getWebMcpInvocationCount(webMcpActivity),
+  );
+  const agentActivityCue = getResearchCycleAgentActivityCue(
+    researchCycleActivityState,
+  );
 
   useEffect(() => {
     if (!openPanel) {
@@ -620,8 +635,14 @@ function WorkbenchHud({
     });
   }
 
-  const researchSummary = getResearchCycleHudSummary(presentation);
-  const interactionCue = getResearchCycleInteractionCue(presentation.state);
+  const researchSummary = getResearchCycleHudSummary(
+    presentation,
+    researchCycleActivityState,
+  );
+  const interactionCue = getResearchCycleInteractionCue(
+    presentation.state,
+    researchCycleActivityState,
+  );
   const webMcpSummary = getWebMcpHudSummary(webMcpActivity);
   const ownerLabel = presentation.owner === "complete"
     ? "Complete"
@@ -663,6 +684,24 @@ function WorkbenchHud({
             })}
           </ol>
           <div className="hud-guidance">
+            {agentActivityCue && (
+              <div
+                className={`hud-agent-activity hud-agent-activity-${agentActivityCue.isWorking ? "working" : "waiting"}`}
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                {agentActivityCue.isWorking && (
+                  <span className="hud-agent-activity-indicator" aria-hidden="true">
+                    ●
+                  </span>
+                )}
+                <span className="hud-agent-activity-copy">
+                  <strong>{agentActivityCue.label}</strong>
+                  <span>{agentActivityCue.supportingText}</span>
+                </span>
+              </div>
+            )}
             <div className="hud-interaction-cue">
               <strong>{interactionCue.label}</strong>
               <span>{interactionCue.supportingText}</span>
@@ -732,7 +771,14 @@ function WorkbenchHud({
             onClick={() => togglePanel("research-cycle")}
           >
             <span className="hud-control-title">Research Cycle</span>
-            <span className="hud-control-status">{researchSummary}</span>
+            <span
+              className="hud-control-status"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              {researchSummary}
+            </span>
           </button>
         )}
         <button
@@ -750,17 +796,6 @@ function WorkbenchHud({
       </div>
     </aside>
   );
-}
-
-function getResearchCycleHudSummary(
-  presentation: ReturnType<typeof deriveResearchCyclePresentation>,
-) {
-  if (presentation.state === "complete") {
-    return "Complete · Approved";
-  }
-  const stageIndex = presentation.activeStageIndex ?? 0;
-  const turn = presentation.owner === "agent" ? "Agent's Turn" : "Your Turn";
-  return `${turn} · ${RESEARCH_CYCLE_STAGES[stageIndex].label} ${stageIndex + 1}/${RESEARCH_CYCLE_STAGES.length}`;
 }
 
 function getResearchCycleHudActionLabel(
@@ -786,15 +821,19 @@ function getWebMcpHudSummary(activity: readonly WebMcpActivityEntry[]) {
   if (running) {
     return `${running.name} running`;
   }
-  const invocationCount = activity.reduce(
-    (total, entry) => total + entry.invocationCount,
-    0,
-  );
+  const invocationCount = getWebMcpInvocationCount(activity);
   if (invocationCount === 0) {
     return `${activity.length} tools`;
   }
   const usedCount = activity.filter((entry) => entry.invocationCount > 0).length;
   return `${usedCount}/${activity.length} used · ${invocationCount} call${invocationCount === 1 ? "" : "s"}`;
+}
+
+function getWebMcpInvocationCount(activity: readonly WebMcpActivityEntry[]) {
+  return activity.reduce(
+    (total, entry) => total + entry.invocationCount,
+    0,
+  );
 }
 
 function WebMcpActivityList({

@@ -628,6 +628,54 @@ h4 {
   background: var(--accent-soft);
 }
 
+.hud-agent-activity {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.45rem;
+  margin-bottom: 0.55rem;
+  padding: 0.52rem 0.58rem;
+  border: 1px solid rgba(49, 79, 168, 0.28);
+  border-radius: 0.38rem;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.hud-agent-activity-copy {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.hud-agent-activity-copy strong {
+  color: var(--agent);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.055em;
+}
+
+.hud-agent-activity-copy span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.hud-agent-activity-indicator {
+  color: var(--agent);
+  line-height: 1.15;
+  animation: research-cycle-agent-pulse 1.15s ease-in-out infinite;
+}
+
+@keyframes research-cycle-agent-pulse {
+  0%,
+  100% {
+    opacity: 0.42;
+    transform: scale(0.88);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .hud-interaction-cue {
   display: flex;
   align-items: baseline;
@@ -1815,6 +1863,7 @@ summary {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .hud-agent-activity-indicator,
   .webmcp-activity-running .webmcp-activity-marker {
     animation: none;
   }

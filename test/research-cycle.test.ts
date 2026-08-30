@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  deriveResearchCycleActivityState,
   deriveResearchCyclePresentation,
   getResearchCycleActionTargetId,
+  getResearchCycleAgentActivityCue,
+  getResearchCycleHudSummary,
   getResearchCycleInteractionCue,
   getResearchCycleStageStatus,
   shouldAutoOpenResearchCycleHud,
@@ -135,9 +138,14 @@ test("maps every presentation state to an explicit interaction mode", () => {
       "approve",
       "complete",
     ].map((state) =>
-      getResearchCycleInteractionCue(state as ReturnType<
-        typeof deriveResearchCyclePresentation
-      >["state"]),
+      getResearchCycleInteractionCue(
+        state as ReturnType<typeof deriveResearchCyclePresentation>["state"],
+        state === "complete"
+          ? "complete"
+          : state === "research" || state === "synthesize"
+            ? "waiting_for_agent"
+            : "human_turn",
+      ),
     ),
     [
       { label: "USE WORKBENCH", supportingText: "Set the mission in the Workbench." },
@@ -151,6 +159,160 @@ test("maps every presentation state to an explicit interaction mode", () => {
   );
 });
 
+test("agent interaction cues request handoff only while waiting", () => {
+  for (const state of ["research", "synthesize"] as const) {
+    const waitingActivity = getResearchCycleAgentActivityCue("waiting_for_agent");
+    const waitingInteraction = getResearchCycleInteractionCue(
+      state,
+      "waiting_for_agent",
+    );
+    assert.equal(waitingActivity?.label, "WAITING FOR AGENT");
+    assert.deepEqual(waitingInteraction, {
+      label: "USE CHAT / VOICE",
+      supportingText: "Tell your agent to continue.",
+    });
+
+    const workingActivity = getResearchCycleAgentActivityCue(
+      "agent_work_in_progress",
+    );
+    const workingInteraction = getResearchCycleInteractionCue(
+      state,
+      "agent_work_in_progress",
+    );
+    assert.equal(workingActivity?.label, "AGENT WORK IN PROGRESS");
+    assert.deepEqual(workingInteraction, {
+      label: "NO ACTION NEEDED",
+      supportingText:
+        "WebMCP activity received. Wait for the Workbench to hand control back.",
+    });
+    assert.doesNotMatch(workingInteraction.supportingText, /continue/i);
+  }
+});
+
+test("agent-owned stages wait for new stage-local activity, then remain in progress between calls", () => {
+  const researchEntryInvocationCount = 4;
+
+  assert.equal(
+    deriveResearchCycleActivityState(
+      "research",
+      researchEntryInvocationCount,
+      researchEntryInvocationCount,
+    ),
+    "waiting_for_agent",
+  );
+  assert.equal(
+    deriveResearchCycleActivityState(
+      "research",
+      researchEntryInvocationCount,
+      researchEntryInvocationCount + 1,
+    ),
+    "agent_work_in_progress",
+  );
+  // Invocation counts remain cumulative after a call succeeds, so an idle gap
+  // within the same semantic stage cannot revert the status to waiting.
+  assert.equal(
+    deriveResearchCycleActivityState(
+      "research",
+      researchEntryInvocationCount,
+      researchEntryInvocationCount + 1,
+    ),
+    "agent_work_in_progress",
+  );
+});
+
+test("Synthesize captures a fresh baseline instead of reusing historical Research calls", () => {
+  const historicalResearchCalls = 6;
+  assert.equal(
+    deriveResearchCycleActivityState("research", 0, historicalResearchCalls),
+    "agent_work_in_progress",
+  );
+  assert.equal(
+    deriveResearchCycleActivityState(
+      "synthesize",
+      historicalResearchCalls,
+      historicalResearchCalls,
+    ),
+    "waiting_for_agent",
+  );
+  assert.equal(
+    deriveResearchCycleActivityState(
+      "synthesize",
+      historicalResearchCalls,
+      historicalResearchCalls + 1,
+    ),
+    "agent_work_in_progress",
+  );
+});
+
+test("human and complete states never expose an agent-working activity state", () => {
+  for (const state of ["define", "curate", "review", "approve"] as const) {
+    const activityState = deriveResearchCycleActivityState(state, 0, 20);
+    assert.equal(activityState, "human_turn");
+    assert.equal(getResearchCycleAgentActivityCue(activityState), null);
+  }
+
+  const activityState = deriveResearchCycleActivityState("complete", 0, 20);
+  assert.equal(activityState, "complete");
+  assert.equal(getResearchCycleAgentActivityCue(activityState), null);
+});
+
+test("agent activity cues state the truthful WebMCP observation boundary", () => {
+  assert.deepEqual(getResearchCycleAgentActivityCue("waiting_for_agent"), {
+    label: "WAITING FOR AGENT",
+    supportingText:
+      "Use chat / voice to hand off this step. The Workbench will update when WebMCP activity begins.",
+    isWorking: false,
+  });
+  assert.deepEqual(getResearchCycleAgentActivityCue("agent_work_in_progress"), {
+    label: "AGENT WORK IN PROGRESS",
+    supportingText:
+      "WebMCP activity received. The Workbench will hand control back when this stage is ready.",
+    isWorking: true,
+  });
+});
+
+test("compact HUD summaries distinguish waiting and working agent stages", () => {
+  const research = deriveResearchCyclePresentation(workspace({ mission }));
+  const synthesize = deriveResearchCyclePresentation(
+    workspace({ mission, accepted_evidence: acceptedEvidence }),
+  );
+  const curate = deriveResearchCyclePresentation(
+    workspace({ mission, proposals: pendingProposals }),
+  );
+  const complete = deriveResearchCyclePresentation(
+    workspace({
+      mission,
+      accepted_evidence: acceptedEvidence,
+      brief: { ...draft, human_reviewed: true, approved: true },
+    }),
+  );
+
+  assert.equal(
+    getResearchCycleHudSummary(research, "waiting_for_agent"),
+    "Waiting for agent · Research 2/5",
+  );
+  assert.equal(
+    getResearchCycleHudSummary(research, "agent_work_in_progress"),
+    "Agent working · Research 2/5",
+  );
+  assert.equal(
+    getResearchCycleHudSummary(synthesize, "waiting_for_agent"),
+    "Waiting for agent · Synthesize 4/5",
+  );
+  assert.equal(
+    getResearchCycleHudSummary(synthesize, "agent_work_in_progress"),
+    "Agent working · Synthesize 4/5",
+  );
+  assert.equal(
+    getResearchCycleHudSummary(curate, "human_turn"),
+    "Your Turn · Curate 3/5",
+  );
+  assert.equal(
+    getResearchCycleHudSummary(complete, "complete"),
+    "Complete · Approved",
+  );
+});
+
 test("auto-opens only once per offscreen Research Cycle state transition", () => {
   assert.equal(shouldAutoOpenResearchCycleHud(null, "define", true), false);
   assert.equal(shouldAutoOpenResearchCycleHud("research", "research", true), false);
@@ -159,6 +321,8 @@ test("auto-opens only once per offscreen Research Cycle state transition", () =>
 
   // A manual close does not change the semantic state, so stable rerenders stay closed.
   assert.equal(shouldAutoOpenResearchCycleHud("curate", "curate", true), false);
+  // Stage-local WebMCP activity also leaves the semantic state unchanged.
+  assert.equal(shouldAutoOpenResearchCycleHud("research", "research", true), false);
   // The next semantic transition is eligible to surface the coach again.
   assert.equal(shouldAutoOpenResearchCycleHud("curate", "synthesize", true), true);
 });

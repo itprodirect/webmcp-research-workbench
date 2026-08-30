@@ -19,10 +19,25 @@ export type ResearchCycleState =
 
 export type ResearchCycleOwner = "human" | "agent" | "complete";
 export type ResearchCycleStageStatus = "complete" | "current" | "future";
+export type ResearchCycleActivityState =
+  | "waiting_for_agent"
+  | "agent_work_in_progress"
+  | "human_turn"
+  | "complete";
 
 export type ResearchCycleInteractionCue = {
-  label: "USE CHAT / VOICE" | "USE WORKBENCH" | "ARTIFACT READY";
+  label:
+    | "USE CHAT / VOICE"
+    | "NO ACTION NEEDED"
+    | "USE WORKBENCH"
+    | "ARTIFACT READY";
   supportingText: string;
+};
+
+export type ResearchCycleAgentActivityCue = {
+  label: "WAITING FOR AGENT" | "AGENT WORK IN PROGRESS";
+  supportingText: string;
+  isWorking: boolean;
 };
 
 export type ResearchCyclePresentation = {
@@ -49,10 +64,18 @@ export function shouldAutoOpenResearchCycleHud(
 
 export function getResearchCycleInteractionCue(
   state: ResearchCycleState,
+  activityState: ResearchCycleActivityState,
 ): ResearchCycleInteractionCue {
   switch (state) {
     case "research":
     case "synthesize":
+      if (activityState === "agent_work_in_progress") {
+        return {
+          label: "NO ACTION NEEDED",
+          supportingText:
+            "WebMCP activity received. Wait for the Workbench to hand control back.",
+        };
+      }
       return {
         label: "USE CHAT / VOICE",
         supportingText: "Tell your agent to continue.",
@@ -71,6 +94,62 @@ export function getResearchCycleInteractionCue(
             : "Review and decide in the Workbench.",
       };
   }
+}
+
+export function deriveResearchCycleActivityState(
+  state: ResearchCycleState,
+  stageEntryInvocationCount: number,
+  currentInvocationCount: number,
+): ResearchCycleActivityState {
+  if (state === "complete") {
+    return "complete";
+  }
+  if (state !== "research" && state !== "synthesize") {
+    return "human_turn";
+  }
+  return currentInvocationCount > stageEntryInvocationCount
+    ? "agent_work_in_progress"
+    : "waiting_for_agent";
+}
+
+export function getResearchCycleAgentActivityCue(
+  activityState: ResearchCycleActivityState,
+): ResearchCycleAgentActivityCue | null {
+  switch (activityState) {
+    case "waiting_for_agent":
+      return {
+        label: "WAITING FOR AGENT",
+        supportingText:
+          "Use chat / voice to hand off this step. The Workbench will update when WebMCP activity begins.",
+        isWorking: false,
+      };
+    case "agent_work_in_progress":
+      return {
+        label: "AGENT WORK IN PROGRESS",
+        supportingText:
+          "WebMCP activity received. The Workbench will hand control back when this stage is ready.",
+        isWorking: true,
+      };
+    default:
+      return null;
+  }
+}
+
+export function getResearchCycleHudSummary(
+  presentation: ResearchCyclePresentation,
+  activityState: ResearchCycleActivityState,
+): string {
+  if (activityState === "complete") {
+    return "Complete · Approved";
+  }
+  const stageIndex = presentation.activeStageIndex ?? 0;
+  const stage = RESEARCH_CYCLE_STAGES[stageIndex];
+  const turn = activityState === "waiting_for_agent"
+    ? "Waiting for agent"
+    : activityState === "agent_work_in_progress"
+      ? "Agent working"
+      : "Your Turn";
+  return `${turn} · ${stage.label} ${stageIndex + 1}/${RESEARCH_CYCLE_STAGES.length}`;
 }
 
 export function deriveResearchCyclePresentation(
