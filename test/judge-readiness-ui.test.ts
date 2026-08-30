@@ -170,16 +170,33 @@ test("brief status reflects draft, human-reviewed, and approved states", () => {
 });
 
 test("brief review and approval are progressive actions with unsaved-edit guards", () => {
-  assert.match(briefComponent, /Save human edits/);
+  assert.match(briefComponent, /All changes saved/);
+  assert.match(briefComponent, /Unsaved changes/);
+  assert.match(briefComponent, /Changes saved/);
+  assert.match(briefComponent, />Save changes<\/button>/);
+  assert.match(briefComponent, /disabled=\{!isDirty\}/);
+  assert.match(briefComponent, /onChange=\{handleFormChange\}/);
+  assert.match(briefComponent, /role="status"/);
+  assert.match(briefComponent, /aria-live="polite"/);
+  assert.match(briefComponent, /saveBriefChangesIfDirty/);
+  assert.match(briefComponent, /saveConfirmation\?\.editorKey === editorKey/);
   assert.match(briefComponent, /Review the saved draft/);
-  assert.match(briefComponent, />Mark reviewed<\/button>/);
+  assert.match(briefComponent, /disabled=\{isDirty\} onClick=\{handleReview\}>Mark reviewed<\/button>/);
   assert.match(briefComponent, /brief\.human_reviewed && !brief\.approved/);
-  assert.match(briefComponent, />Approve brief<\/button>/);
+  assert.match(briefComponent, /disabled=\{isDirty\} onClick=\{handleApprove\}>Approve brief<\/button>/);
   assert.match(briefComponent, /hasUnsavedFormChanges\(form\)/);
   assert.match(briefComponent, /Save your edits before completing review\./);
   assert.match(briefComponent, /Save your edits before approving the brief\./);
+  assert.doesNotMatch(briefComponent, /Save human edits/);
   assert.doesNotMatch(briefComponent, />Reviewed<\/button>|>Approved<\/button>/);
   assert.doesNotMatch(briefComponent, /disabled=\{!brief\.human_reviewed/);
+});
+
+test("brief editor identity changes only with editable content", () => {
+  assert.match(briefComponent, /key=\{editorKey\}/);
+  assert.match(briefComponent, /getBriefEditorContentKey\(brief\)/);
+  assert.doesNotMatch(briefComponent, /key=\{brief\.updated_at\}/);
+  assert.doesNotMatch(briefComponent, /key=\{`\$\{brief\.updated_at\}/);
 });
 
 test("approval reveals one immediate local completion handoff without navigation", () => {

@@ -1418,6 +1418,16 @@ summary {
   font-weight: 700;
 }
 
+.brief-save-status {
+  margin: 0;
+  color: var(--approved);
+  font-weight: 800;
+}
+
+.brief-save-status-dirty {
+  color: var(--human);
+}
+
 .brief-workflow-action {
   margin-top: 1rem;
   padding: 1rem;
