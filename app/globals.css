@@ -628,6 +628,29 @@ h4 {
   background: var(--accent-soft);
 }
 
+.hud-interaction-cue {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.55rem;
+  margin-bottom: 0.48rem;
+  padding-bottom: 0.48rem;
+  border-bottom: 1px solid rgba(39, 62, 53, 0.13);
+}
+
+.hud-interaction-cue strong {
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.hud-interaction-cue span {
+  color: var(--muted);
+  font-size: 0.73rem;
+  font-weight: 700;
+}
+
 .hud-guidance h3 {
   margin-top: 0.08rem;
   font-size: 0.94rem;

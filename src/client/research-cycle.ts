@@ -20,6 +20,11 @@ export type ResearchCycleState =
 export type ResearchCycleOwner = "human" | "agent" | "complete";
 export type ResearchCycleStageStatus = "complete" | "current" | "future";
 
+export type ResearchCycleInteractionCue = {
+  label: "USE CHAT / VOICE" | "USE WORKBENCH" | "ARTIFACT READY";
+  supportingText: string;
+};
+
 export type ResearchCyclePresentation = {
   state: ResearchCycleState;
   activeStageIndex: number | null;
@@ -29,6 +34,44 @@ export type ResearchCyclePresentation = {
   guidance: string;
   nextStep: string;
 };
+
+export function shouldAutoOpenResearchCycleHud(
+  previousState: ResearchCycleState | null,
+  currentState: ResearchCycleState,
+  isFullCycleOffscreen: boolean,
+): boolean {
+  return (
+    previousState !== null &&
+    previousState !== currentState &&
+    isFullCycleOffscreen
+  );
+}
+
+export function getResearchCycleInteractionCue(
+  state: ResearchCycleState,
+): ResearchCycleInteractionCue {
+  switch (state) {
+    case "research":
+    case "synthesize":
+      return {
+        label: "USE CHAT / VOICE",
+        supportingText: "Tell your agent to continue.",
+      };
+    case "complete":
+      return {
+        label: "ARTIFACT READY",
+        supportingText: "Download or copy the approved brief.",
+      };
+    default:
+      return {
+        label: "USE WORKBENCH",
+        supportingText:
+          state === "define"
+            ? "Set the mission in the Workbench."
+            : "Review and decide in the Workbench.",
+      };
+  }
+}
 
 export function deriveResearchCyclePresentation(
   workspace: ResearchWorkspaceState,
