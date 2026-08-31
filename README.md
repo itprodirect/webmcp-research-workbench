@@ -1,4 +1,8 @@
-# WebMCP Research Workbench
+# Three in the Loop
+
+**A WebMCP Research Workbench**
+
+You, your agent, and the website working together.
 
 A human-controlled evidence workspace where WebMCP-enabled agents can research,
 propose evidence, and draft source-linked briefs while humans retain control of
