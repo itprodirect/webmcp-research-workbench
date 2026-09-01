@@ -1,114 +1,156 @@
+![Three in the Loop hero showing the human-controlled research thesis and real WebMCP product activity](docs/submission-media/final/01-three-in-the-loop-hero-cover.png)
+
 # Three in the Loop
 
 **A WebMCP Research Workbench**
 
-You, your agent, and the website working together.
+> **The agent gathers. You decide what counts.**
 
-A human-controlled evidence workspace where WebMCP-enabled agents can research,
-propose evidence, and draft source-linked briefs while humans retain control of
-evidence membership and conclusions.
+Three in the Loop is a human-controlled research workspace where a WebMCP-enabled
+agent does the research legwork through website-declared structured capabilities,
+while the human decides what becomes evidence and what is ultimately approved.
 
-## Live application
+**Human defines → Agent researches → Human curates → Agent synthesizes → Human approves**
 
-Primary: <https://research.itprodirect.com/>
+## Judges — start here
 
-Vercel fallback: <https://webmcp-research-workbench.vercel.app/>
+| | |
+|---|---|
+| **Live app** | [https://research.itprodirect.com/](https://research.itprodirect.com/) |
+| **Fallback** | [https://webmcp-research-workbench.vercel.app/](https://webmcp-research-workbench.vercel.app/) |
+| **Tested environment** | A fresh Windows ChatGPT Work conversation using its supported in-app/browser WebMCP experience |
+| **Product status** | Human accepted and frozen for submission |
 
-**V0 status:** `V0 HUMAN ACCEPTED / FROZEN FOR SUBMISSION`
+The fastest way to evaluate the project is to watch three things:
+
+1. the agent invokes structured research capabilities against the live Workbench;
+2. the agent stops at the evidence boundary so the human can accept or reject each
+   proposal; and
+3. synthesis uses only human-accepted evidence before the human reviews, approves,
+   and downloads the Markdown artifact.
+
+[Run the seven-step judge walkthrough](#quick-judge-walkthrough).
 
 ## Why WebMCP
 
-WebMCP gives an enabled agent five declared, structured capabilities against the
-same browser-local workspace used by the visible human interface. The agent can
-read, research, propose, and draft without scraping the UI, inferring DOM behavior,
-or imitating human clicks.
+The innovation is not simply that an AI agent can research. The agent and the
+human collaborate against the **same live browser workspace**, with different and
+explicit authority.
 
-The website does not embed or run an AI model. A compatible WebMCP-enabled agent
-uses the capabilities exposed by the workbench.
+WebMCP lets the website declare the operations it intentionally supports. The
+agent can read workspace state, search OpenAlex, inspect sources, propose evidence,
+and draft a brief through bounded structured calls. It does not need to scrape the
+visible interface, infer every action from the DOM, or imitate human clicks.
 
-## Human / Agent model
+The visible Research Cycle and WebMCP activity HUD make those handoffs legible:
+agent-owned stages direct the human to chat or wait, human-owned stages direct the
+human to the Workbench, and completion exposes the approved artifact.
 
-**Human**
+![Five-stage Three in the Loop workflow: Human defines, Agent researches, Human curates, Agent synthesizes, Human approves](docs/submission-media/final/02-how-it-works.png)
 
-- Defines the research mission.
-- Accepts, rejects, or removes evidence.
-- Edits, reviews, and approves the brief.
+WebMCP supplies the structured collaboration surface. It does **not** guarantee
+truth, provenance, trust, or security; Three in the Loop addresses those concerns
+through visible source metadata, constrained drafting, and human evidence and
+approval decisions.
 
-**Agent**
+## Human + agent authority model
 
-- Reads the shared workspace.
-- Searches and inspects OpenAlex sources.
-- Proposes evidence for human review.
-- Drafts a brief from human-accepted evidence.
+**Agent proposes. Human decides.**
 
-## Workflow
+![Authority model showing human decisions and agent research legwork](docs/submission-media/final/03-who-does-what.png)
 
-**Define → Agent researches → Human accepts → Agent synthesizes → Human approves**
+The human owns mission definition, evidence membership, brief editing, review, and
+final approval. The agent owns workspace reading, OpenAlex research, source
+inspection, evidence proposals, and Evidence Brief drafting.
 
-1. The human defines the research mission.
-2. The human tells the agent what to research; the agent works through WebMCP.
-3. The human curates the proposed evidence.
-4. The human tells the agent to continue and synthesize from the accepted evidence.
-5. The agent drafts using only human-accepted evidence.
-6. The human reviews the draft, saves changes only when edits are present, marks the
-   brief reviewed, and approves it.
-7. The approved Markdown can be downloaded or copied.
+That boundary is intentional: research throughput can be delegated without
+delegating the judgment of what counts as evidence.
 
-The optional **Copy example instruction** action remains available as onboarding or
-fallback, but copying a prompt is not the required or default interaction model.
+## Real product proof
 
-## Workbench HUD
+### Evidence curation
 
-A persistent unified HUD keeps the current **Research Cycle** status and live
-**WebMCP** activity available while the human and agent move through the workspace.
-When the full cycle is offscreen, each new workflow state surfaces the Research
-Cycle coach once. Before new stage-local WebMCP activity, an agent-owned stage shows
-**WAITING FOR AGENT** and directs the human to **USE CHAT / VOICE**. Once real
-activity arrives, it shows **AGENT WORK IN PROGRESS** and **NO ACTION NEEDED**.
-Human-owned stages show **USE WORKBENCH**, and completion shows **ARTIFACT READY**.
+![Real Curate state showing three agent evidence proposals, Accept and Reject controls, and the Research Cycle handoff](docs/submission-media/final/04-human-controlled-evidence-curation.png)
 
-## Exactly five WebMCP tools
+The agent has proposed three real OpenAlex sources and stopped. The human-visible
+Workbench keeps **Accept evidence** and **Reject** outside the agent tool surface,
+while the Research Cycle identifies Curate as the human's turn.
 
-1. `get_research_workspace` — reads the mission and compact workspace state.
-2. `search_sources` — searches real OpenAlex works in keyword or OpenAlex-hosted
-   semantic mode.
-3. `get_source_details` — inspects normalized OpenAlex provenance and metadata.
-4. `propose_evidence` — stages resolved sources for human acceptance or rejection.
-5. `draft_evidence_brief` — places a review-required draft whose findings cite only
-   accepted source IDs.
+### Approved artifact
 
-## Architecture and trust boundary
+![Real completed research cycle showing a human-approved artifact and Markdown download](docs/submission-media/final/05-approved-artifact-ready.png)
 
-- OpenAlex is the only research provider.
-- There is no embedded/runtime LLM and no OpenAI API integration.
-- Agent operations use structured tools, not DOM actuation or UI scraping.
-- There are no embeddings, vector database, backend database, or authentication.
-- One bounded, versioned browser `sessionStorage` workspace is shared by the human
-  UI and the WebMCP adapter. It survives same-tab refreshes, while a new browser
-  session starts clean.
-- External provider titles, abstracts, metadata, and URLs remain inert, untrusted
-  evidence rather than instructions or credibility assessments.
-- Every brief finding may cite only evidence already accepted by a human.
-- Mission definition, evidence membership, editing, review, and final approval are
-  human-only actions.
+After synthesis, the human reviews and approves the brief. The completed real run
+shows all five stages, **ARTIFACT READY**, the approved brief, and the Markdown
+download action in the same shared workspace.
+
+## WebMCP implementation
+
+![WebMCP architecture connecting the enabled agent, shared browser workspace, five tools, human authority, and OpenAlex](docs/submission-media/final/06-webmcp-architecture.png)
+
+Three in the Loop exposes exactly five website-declared WebMCP tools:
+
+| Tool | Purpose | Authority boundary |
+|---|---|---|
+| `get_research_workspace` | Read the mission and compact shared-workspace state | Read-only; does not make human decisions |
+| `search_sources` | Search real OpenAlex works | Agent research action |
+| `get_source_details` | Inspect normalized source metadata and provenance | Agent inspection action |
+| `propose_evidence` | Stage resolved sources for human review | Proposes only; cannot accept evidence |
+| `draft_evidence_brief` | Draft findings from human-accepted source IDs | Produces a review-required draft; cannot approve it |
+
+Human-only actions—mission definition, evidence acceptance or rejection, editing,
+review, and approval—remain outside the WebMCP tool surface. OpenAlex is the only
+research provider.
 
 ## Quick judge walkthrough
 
-1. **Human UI:** Open the live application in an environment with WebMCP support
-   enabled and define the visible Research Mission.
-2. **Agent:** Tell the agent what to research and ask it to stop when human evidence
-   review is required.
-3. **Agent:** Let it read the workspace, search, inspect, and propose promising
-   OpenAlex evidence through WebMCP.
-4. **Human UI:** Accept or reject the proposals.
-5. **Agent:** Tell the agent to continue and synthesize from only the accepted
-   evidence.
-6. **Human UI:** Review the draft, save changes only when edits are present, mark it
-   reviewed, and approve it.
-7. **Human UI:** Download or copy the approved Markdown artifact.
+1. Open the [production Workbench](https://research.itprodirect.com/) in a
+   WebMCP-compatible client.
+2. In the visible UI, define a Research Mission, audience, and evidence limit.
+3. Ask the agent to research and stop when evidence review is required.
+4. In the Workbench, accept strong proposals and reject weak ones.
+5. Ask the agent to synthesize from only the accepted evidence.
+6. Review the draft, save only real edits, mark it reviewed, and approve it.
+7. Download the exact approved Markdown with **Download approved brief (.md)**.
 
-The unified HUD keeps the Research Cycle position and live WebMCP activity visible
-throughout the handoffs.
+Short conversational turns work best: hand Research to the agent, let the human
+curate, hand Synthesize back to the agent, then let the human review and approve.
+The HUD distinguishes whether the next action is to **talk, wait, or click**.
+
+## Validation and proof
+
+| Evidence | Final result |
+|---|---|
+| Automated tests | **93/93 PASS** |
+| Lint | **PASS** |
+| Production build | **PASS** |
+| Production validation | **PASS** |
+| Final human dogfood | **PASS** |
+| Accepted WebMCP run | **All five tools exercised** |
+
+The final accepted Windows ChatGPT Work run completed the full loop: the human
+defined the mission, curated the evidence, replaced a weak proposal, delegated
+synthesis, reviewed and approved the brief, and downloaded the approved Markdown.
+See the [final dogfood checkpoint](docs/22-final-dogfood-checkpoint-2026-08-30.md)
+and [human acceptance runbook](docs/23-final-human-acceptance-runbook.md).
+
+## Architecture and trust boundaries
+
+- **OpenAlex only:** no additional provider, crawler, or arbitrary-URL fetcher.
+- **No embedded model:** the website does not run an LLM and has no OpenAI API
+  integration.
+- **No standalone MCP server:** the capabilities are exposed by the website
+  through WebMCP.
+- **No backend data layer:** no database, authentication, embeddings, vector
+  database, or RAG system.
+- **Bounded browser state:** one versioned `sessionStorage` workspace is shared by
+  the human UI and WebMCP adapter. Same-tab refreshes survive; a new browser
+  session starts clean.
+- **Untrusted external content:** provider titles, abstracts, metadata, and URLs
+  remain inert evidence, never application instructions or automatic credibility
+  judgments.
+- **Human evidence authority:** every brief finding may cite only evidence already
+  accepted by a human; evidence membership and final approval are human-only.
 
 ## Local development
 
@@ -119,19 +161,7 @@ npm run dev
 
 Open <http://localhost:3000/>.
 
-## Validation
-
-Final submission-candidate validation:
-
-- `npm test` — 93/93 PASS
-- `npm run lint` — PASS
-- `npm run build` — PASS
-- production deployment — PASS
-- `research.itprodirect.com` — HTTP 200
-- Vercel fallback — HTTP 200
-- PR #10 production handoff smoke — PASS
-
-Run the local validators with:
+Run the local validation commands with:
 
 ```bash
 npm test
@@ -142,16 +172,18 @@ npm run build
 ## WebMCP testing notes
 
 WebMCP tool discovery and invocation require a browser or client environment with
-WebMCP support enabled. The repository does not claim universal client or browser-
-version compatibility. The historical Phase 2A and Phase 2B deployment records
-capture the supported Codex In-app Browser observations and limitations at those
-gates. V0 was subsequently exercised on public production in Windows ChatGPT Work;
-see the dogfood records for those observations.
+WebMCP support enabled. The repository does not claim universal client or browser
+version compatibility. The accepted public-production workflow was exercised in
+Windows ChatGPT Work; historical phase records document earlier Codex in-app
+browser observations and limitations.
 
-## Documentation
+## Documentation and evidence
 
-Documents 00–17 preserve the planning and phase chronology. They remain historical
-evidence where later V0 decisions supersede their earlier expectations.
+Documents 00–17 preserve planning and phase chronology. Later acceptance and
+freeze records supersede earlier expectations where they differ.
+
+<details>
+<summary>Planning, validation, dogfood, and freeze records</summary>
 
 1. [Project brief](docs/00-project-brief.md)
 2. [WebMCP Challenge requirements](docs/01-webmcp-challenge-requirements.md)
@@ -160,7 +192,7 @@ evidence where later V0 decisions supersede their earlier expectations.
 5. [WebMCP tool design](docs/04-webmcp-tool-design.md)
 6. [Security boundaries](docs/05-security-boundaries.md)
 7. [Technical Gate and MVP success criteria](docs/06-mvp-success-criteria.md)
-8. [Original demo plan — historical planning artifact; final plan pending](docs/07-demo-plan.md)
+8. [Original demo plan — historical planning artifact](docs/07-demo-plan.md)
 9. [Build backlog](docs/08-build-backlog.md)
 10. [Decision log](docs/09-decision-log.md)
 11. [Technical Gate evidence](docs/10-technical-gate-evidence.md)
@@ -177,6 +209,11 @@ evidence where later V0 decisions supersede their earlier expectations.
 22. [Phase 3 historical after-action report](docs/21-phase-3-aar-historical.md)
 23. [Final dogfood checkpoint — 2026-08-30](docs/22-final-dogfood-checkpoint-2026-08-30.md)
 24. [Final human acceptance runbook](docs/23-final-human-acceptance-runbook.md)
+
+</details>
+
+The frozen, human-approved media package is documented in
+[docs/submission-media/](docs/submission-media/README.md).
 
 ## License
 
