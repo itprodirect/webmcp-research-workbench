@@ -14,7 +14,7 @@ Primary: <https://research.itprodirect.com/>
 
 Vercel fallback: <https://webmcp-research-workbench.vercel.app/>
 
-**V0 status:** `V0 PRODUCT CODE COMPLETE — FINAL HUMAN HANDOFF ACCEPTANCE PENDING`
+**V0 status:** `V0 HUMAN ACCEPTED / FROZEN FOR SUBMISSION`
 
 ## Why WebMCP
 
@@ -121,8 +121,7 @@ Open <http://localhost:3000/>.
 
 ## Validation
 
-Current canonical validation at
-`5b48d931142ba09a2f0135e404ecad282ddc327b`:
+Final submission-candidate validation:
 
 - `npm test` — 93/93 PASS
 - `npm run lint` — PASS

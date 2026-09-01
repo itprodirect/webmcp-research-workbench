@@ -2,13 +2,13 @@
 
 ## Status
 
-- **Product implementation:** CODE COMPLETE PENDING FINAL HUMAN ACCEPTANCE
-- **Demo Interaction Model:** NOT YET FROZEN
+- **Product implementation:** HUMAN ACCEPTED / FROZEN FOR SUBMISSION
+- **Demo Interaction Model:** HUMAN ACCEPTED / FROZEN
 - **Canonical main:** `5b48d931142ba09a2f0135e404ecad282ddc327b`
 - **Primary production:** <https://research.itprodirect.com/>
 - **Vercel fallback:** <https://webmcp-research-workbench.vercel.app/>
 - **Current validation:** 93/93 tests, lint PASS, build PASS
-- **Remaining product gate:** short Windows ChatGPT Work human handoff acceptance
+- **Remaining product gate:** NONE
 
 This checkpoint records how the earlier V0 freeze was deliberately reopened in
 response to dogfood blockers. Documents 18–21 remain historical records of the
@@ -285,24 +285,36 @@ These items are deferred, not blockers:
 ## Current disposition
 
 Product implementation:
-**CODE COMPLETE PENDING FINAL HUMAN ACCEPTANCE**
+**HUMAN ACCEPTED / FROZEN FOR SUBMISSION**
 
 Demo Interaction Model:
-**NOT YET FROZEN**
+**HUMAN ACCEPTED / FROZEN**
 
 Remaining product gate:
 
-A short Windows ChatGPT Work run must verify that a human can understand, without
-relying on the written runbook:
+**NONE**
 
-1. **WAITING FOR AGENT** → speak/use chat;
-2. **AGENT WORK IN PROGRESS** → no action needed;
-3. **USE WORKBENCH** → human acts;
-4. Synthesize resets to **WAITING FOR AGENT** despite historical Research activity;
-5. new Synthesize WebMCP activity becomes **AGENT WORK IN PROGRESS**.
+## Final human acceptance: 2026-08-31
 
-If this passes:
+The final Windows ChatGPT Work run passed. The human initiated the research mission
+conversationally; the agent set the mission through the Workbench and performed
+Research through WebMCP. The human curated the evidence, accepted two proposed
+sources, rejected one, asked the agent to find a better third primary source, and
+accepted the staged replacement.
 
-**Demo Interaction Model — HUMAN ACCEPTED / FROZEN**
+The human then delegated Synthesize to the agent. The agent drafted from the three
+human-accepted sources; the human reviewed and approved the final brief, directly
+downloaded the approved Markdown artifact, and the Research Cycle reached Complete
+/ Approved with **ARTIFACT READY** displayed. All five WebMCP tools were exercised
+during the completed workflow.
 
-No additional product work should follow except a genuine release blocker.
+The acceptance question, "Without remembering the internal runbook, is it
+immediately clear whether I should TALK, WAIT, or CLICK?", was answered **YES**.
+Final result: **PASS**.
+
+An initial voice transcription opened the wrong domain. This was a demo and
+recording issue. After the human corrected it to `research.itprodirect.com`, the
+run completed successfully. It is not a product defect or release blocker and must
+not reopen product work.
+
+No additional V0 product work should occur except for a genuine release blocker.

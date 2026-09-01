@@ -69,6 +69,18 @@ Do not automatically reopen code for aesthetic or low-value issues.
 The run may stop after Synthesize/Review if all handoff transitions are proven. A
 complete research-quality artifact is not required for this acceptance test.
 
+## Final result: 2026-08-31
+
+**Result:** PASS
+
+**Demo Interaction Model:** HUMAN ACCEPTED / FROZEN
+
+**Acceptance question:** YES
+
+The final Windows ChatGPT Work run completed beyond the minimum required handoff
+test. It reached human approval of the final brief and direct human download of the
+approved Markdown artifact.
+
 ## Next steps after PASS
 
 1. documentation freeze addendum or current-status update;
