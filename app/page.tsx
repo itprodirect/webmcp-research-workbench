@@ -10,9 +10,12 @@ export default function Home() {
         <p className="product-descriptor">A WebMCP Research Workbench</p>
         <h1>The agent gathers. You decide what counts.</h1>
         <p className="lede">
-          You, your agent, and the website working together. Through WebMCP, your agent
-          searches real scholarly sources, proposes evidence, and drafts a cited brief.
-          You control what counts as evidence and what gets approved.
+          <span className="lede-emphasis">
+            You, your agent, and the website working together.
+          </span>{" "}
+          Through WebMCP, your agent searches real scholarly sources, proposes evidence,
+          and drafts a cited brief. You control what counts as evidence and what gets
+          approved.
         </p>
         <p className="header-boundary">
           Real OpenAlex research · human-controlled evidence · source-linked conclusions
