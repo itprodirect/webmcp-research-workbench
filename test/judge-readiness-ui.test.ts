@@ -22,7 +22,10 @@ const briefComponent = workbench.slice(
 );
 
 test("judge-facing framing teaches the five-step human-agent workflow", () => {
+  assert.match(page, /Three in the Loop/);
+  assert.match(page, /A WebMCP Research Workbench/);
   assert.match(page, /The agent gathers\. You decide what counts\./);
+  assert.match(page, /You, your agent, and the website working together\./);
   assert.doesNotMatch(page, /Phase 2B/);
   for (const step of ["Define", "Research", "Curate", "Synthesize", "Approve"]) {
     assert.ok(researchCycle.includes(`label: "${step}"`));

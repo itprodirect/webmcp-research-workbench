@@ -3,8 +3,9 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "WebMCP Research Workbench",
-  description: "A human-authorized OpenAlex evidence mission shared with WebMCP agents.",
+  title: "Three in the Loop: A WebMCP Research Workbench",
+  description:
+    "You, your agent, and the website working together. Human-directed research through WebMCP.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

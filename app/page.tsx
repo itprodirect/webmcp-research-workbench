@@ -6,12 +6,16 @@ export default function Home() {
     <main>
       <header className="page-header">
         <p className="eyebrow">Human-directed research · Agent-accelerated</p>
-        <p className="product-name">WebMCP Research Workbench</p>
+        <p className="product-name">Three in the Loop</p>
+        <p className="product-descriptor">A WebMCP Research Workbench</p>
         <h1>The agent gathers. You decide what counts.</h1>
         <p className="lede">
-          A shared research workspace where a WebMCP-enabled agent searches real
-          scholarly sources, proposes evidence, and drafts a cited brief — while you
-          control what counts as evidence and what gets approved.
+          <span className="lede-emphasis">
+            You, your agent, and the website working together.
+          </span>{" "}
+          Through WebMCP, your agent searches real scholarly sources, proposes evidence,
+          and drafts a cited brief. You control what counts as evidence and what gets
+          approved.
         </p>
         <p className="header-boundary">
           Real OpenAlex research · human-controlled evidence · source-linked conclusions
