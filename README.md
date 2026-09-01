@@ -143,14 +143,35 @@ and [human acceptance runbook](docs/23-final-human-acceptance-runbook.md).
   through WebMCP.
 - **No backend data layer:** no database, authentication, embeddings, vector
   database, or RAG system.
-- **Bounded browser state:** one versioned `sessionStorage` workspace is shared by
-  the human UI and WebMCP adapter. Same-tab refreshes survive; a new browser
-  session starts clean.
+- **Bounded browser state:** within one tab, one versioned `sessionStorage`
+  workspace is shared by the human UI and WebMCP adapter. Same-tab refreshes
+  survive; a new browser session starts clean.
 - **Untrusted external content:** provider titles, abstracts, metadata, and URLs
   remain inert evidence, never application instructions or automatic credibility
   judgments.
 - **Human evidence authority:** every brief finding may cite only evidence already
-  accepted by a human; evidence membership and final approval are human-only.
+  accepted by a human; evidence-membership and final-approval operations remain
+  outside the WebMCP tool surface.
+
+### Security and trust boundaries
+
+External OpenAlex content is treated as untrusted data, not application
+instruction. The site exposes a bounded five-tool WebMCP surface for reading
+workspace state, searching, inspecting, proposing evidence, and drafting. Provider
+identities are normalized, arbitrary URL fetching is not exposed, and tool
+annotations distinguish read-only from state-changing operations. Evidence
+acceptance or rejection, brief review, and final approval remain outside the
+WebMCP tool surface; drafts may cite only human-accepted evidence, and an agent
+draft does not publish automatically.
+
+Before submission, current Chrome/WebMCP guidance was reviewed and the repository
+underwent blind adversarial model analysis, independent Codex verification, and a
+Claude Code challenge review. The reconciled review established zero Critical and
+zero High-severity issues. Lower-severity hardening plus deterministic,
+model-facing, and browser-agent evaluation remain planned after submission. This
+is not a certification, formal penetration test, or claim that V0 is
+prompt-injection-proof or universally secure. See the
+[V0 security posture](docs/security-posture-v0.md).
 
 ## Local development
 
