@@ -17,6 +17,7 @@ while the human decides what becomes evidence and what is ultimately approved.
 | | |
 |---|---|
 | **Live app** | [https://research.itprodirect.com/](https://research.itprodirect.com/) |
+| **Demo video** | [Watch the 1:53 WebMCP Challenge demo](https://youtu.be/yefGaOgbdDY) |
 | **Fallback** | [https://webmcp-research-workbench.vercel.app/](https://webmcp-research-workbench.vercel.app/) |
 | **Tested environment** | A fresh Windows ChatGPT Work conversation using its supported in-app/browser WebMCP experience |
 | **Product status** | Human accepted and frozen for submission |
